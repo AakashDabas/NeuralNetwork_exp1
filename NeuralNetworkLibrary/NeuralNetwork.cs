@@ -130,8 +130,13 @@ namespace Dabas.NeuralNewtork
                 Neuron dest = Neuron.neurons[connection.dest];
 
                 double weightDelta = -learningRate * dest.deltaBack * src.output;
+
+                if (weightDelta * connection.previousWeightDelta < 0)
+                    connection.previousWeightDelta *= 0.5;
+
                 Connection.connections[connection.connectionIdx].weight += weightDelta + momentum * connection.previousWeightDelta;
-                Connection.connections[connection.connectionIdx].previousWeightDelta += weightDelta;
+
+                Connection.connections[connection.connectionIdx].previousWeightDelta = connection.previousWeightDelta + weightDelta;
 
                 //if (displayOutput)
                 //{

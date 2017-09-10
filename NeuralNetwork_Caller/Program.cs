@@ -48,26 +48,30 @@ namespace NeuralNetwork_Caller
 
         static double test2()
         {
-            NeuralNetwork nn = new NeuralNetwork(new int[] { 1, 1 },
+            NeuralNetwork nn = new NeuralNetwork(new int[] { 1, 5, 1 },
                                                new TransferFuncType[] { TransferFuncType.NONE,
-                                                TransferFuncType.LINEAR});
+                                               TransferFuncType.SIGMOID,
+                                               TransferFuncType.LINEAR});
 
             double error = 0;
 
-            for (int i = 0; i < 200; i++)
+            for (int i = 0; i < 20; i++)
             {
                 error = 0;
-                double learningRate = 0.05;
-                double momentum = 0.0;
+                double learningRate =0.1;
+                double momentum = 0.05;
                 bool displayOutput = false;
                 if (i % 1 == 0)
                 {
                     Console.WriteLine("__________");
                     displayOutput = true;
                 }
-                Random gen = new Random();
-                int input = (int)(gen.NextDouble() * 10);
-                error += nn.Train(new double[] { input }, new double[] { input }, learningRate, momentum, displayOutput);
+                for(int j = 0; j < 25; j++)
+                {
+                    Random gen = new Random();
+                    double input = 2 * gen.NextDouble() - 1;
+                    error += nn.Train(new double[] { input }, new double[] { Math.Cos(input) }, learningRate, momentum, false);
+                }
                 if (displayOutput)
                     Console.WriteLine("Error : {0}", error);
             }
