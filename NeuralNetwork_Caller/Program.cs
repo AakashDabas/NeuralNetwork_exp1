@@ -11,27 +11,28 @@ namespace NeuralNetwork_Caller
     {
         static void Main(string[] args)
         {
-            test2();
+            test1();
             Console.WriteLine("Execution Completed : )\nPress Any Key To Continue");
             Console.ReadKey();
         }
 
         static double test1()
         {
-            NeuralNetwork nn = new NeuralNetwork(new int[] { 2, 2, 1 },
+            NeuralNetwork nn = new NeuralNetwork(new int[] { 2, 20, 1 },
                                                new TransferFuncType[] { TransferFuncType.NONE,
-                                                TransferFuncType.SIGMOID,
-                                                TransferFuncType.LINEAR});
+                                                TransferFuncType.RECTILINEAR,
+                                                TransferFuncType.SIGMOID});
 
             double error = 0;
 
-            for (int i = 0; i < 100000; i++)
+            int limit = 10000;
+            for (int i = 0; i < limit; i++)
             {
                 error = 0;
-                double learningRate = 0.15;
-                double momentum = 0.0;
+                double learningRate = 0.25;
+                double momentum = 0.3;
                 bool displayOutput = false;
-                if (i % 1000 == 0)
+                if (i % (limit > 10 ? limit / 10 : 1) == 0)
                 {
                     Console.WriteLine("__________");
                     displayOutput = true;
