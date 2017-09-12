@@ -4,10 +4,11 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Dabas.NeuralNewtork;
+using System.Threading;
 
 namespace NeuralNetwork_Caller
 {
-    class Program
+    class Controller
     {
         static void Main(string[] args)
         {

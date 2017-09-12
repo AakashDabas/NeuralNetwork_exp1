@@ -43,5 +43,11 @@
     <Compile Include="NeuralNetwork.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NeuralNetwork UI\NeuralNetwork UI.csproj">
+      <Project>{7deeb3c6-a0cc-45b1-8725-84f45d845e75}</Project>
+      <Name>NeuralNetwork UI</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
