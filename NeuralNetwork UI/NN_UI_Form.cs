@@ -22,13 +22,17 @@ namespace Dabas.NeuralNetwork_UI
         Queue<double> xAxisData, yAxisData;
         System.Timers.Timer graphUpdateTimer;
 
+        delegate void UpdateCall();
+
+        public bool graphUpdateOngoing = false;
+
         public NNUIFORM()
         {
             InitializeComponent();
 
             graphUpdateTimer = new System.Timers.Timer();
             graphUpdateTimer.Enabled = true;
-            graphUpdateTimer.Interval = 1;
+            graphUpdateTimer.Interval = 1000;
             graphUpdateTimer.Elapsed += new ElapsedEventHandler(graphUpdateTimer_Tick);
             graphUpdateTimer.Start();
 
@@ -71,8 +75,8 @@ namespace Dabas.NeuralNetwork_UI
             // 
             // errorGraph
             // 
-            this.errorGraph.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
+            this.errorGraph.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
+            | System.Windows.Forms.AnchorStyles.Left)
             | System.Windows.Forms.AnchorStyles.Right)));
             chartArea1.Name = "ChartArea1";
             this.errorGraph.ChartAreas.Add(chartArea1);
@@ -114,30 +118,36 @@ namespace Dabas.NeuralNetwork_UI
 
         private void UpdateErrorGraph()
         {
-            if (xAxisData == null || yAxisData == null)
-                return;
-            if (xAxisData.Count != yAxisData.Count)
-                return;
-            lock (xAxisData)
+            if (errorGraph.InvokeRequired)
             {
-                lock(yAxisData)
+                errorGraph.Invoke(new UpdateCall(UpdateErrorGraph));
+            }
+            else
+            {
+                if (xAxisData == null || yAxisData == null)
+                    return;
+                if (xAxisData.Count != yAxisData.Count)
+                    return;
+
+                while (xAxisData.Count != 0)
                 {
-                    Console.WriteLine("LOCK AQUIRED BY UI");
-                    while (xAxisData.Count != 0)
-                    {
-                        double x, y;
-                        x = xAxisData.Dequeue();
-                        y = yAxisData.Dequeue();
-                        series.Points.AddXY(x, y);
-                    }
+                    double x, y;
+                    x = xAxisData.Dequeue();
+                    y = yAxisData.Dequeue();
+                    series.Points.AddXY(x, y);
                 }
             }
-            Console.WriteLine("LOCK RELEASED BY UI");
         }
 
         private void graphUpdateTimer_Tick(object sender, EventArgs e)
         {
-            UpdateErrorGraph();
+            
+            if (graphUpdateOngoing == false)
+            {
+                graphUpdateOngoing = true;
+                UpdateErrorGraph();
+                graphUpdateOngoing = false;
+            }
         }
 
         public void AddToChart(ref Queue<double> xAxisData, ref Queue<double> yAxisData)

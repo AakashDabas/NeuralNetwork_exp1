@@ -18,14 +18,15 @@ namespace Dabas.NeuralNewtork
         // To store graph data
         Queue<double> xAxisData, yAxisData;
 
-        public NeuralNetwork(int[] NeuronCnt, TransferFuncType[] tFuncType, double weightRescaleFactor = 1)
+        public NeuralNetwork(int[] NeuronCnt, TransferFuncType[] tFuncType, double weightRescaleFactor = 1, bool showNNUI = true)
         {
             xAxisData = new Queue<double>();
             yAxisData = new Queue<double>();
             ui = new NeuralNetworkUI();
             ui.AddToChart(ref xAxisData, ref yAxisData);
             UIThread = new Thread(ui.StartUI);
-            UIThread.Start();
+            if(showNNUI)
+                UIThread.Start();
 
             if (NeuronCnt.Length != tFuncType.Length)
                 throw new Exception("Input size mismatch! Invalid input to NeuralNetwork Constructor");
@@ -155,19 +156,19 @@ namespace Dabas.NeuralNewtork
                 Neuron.neurons[connection.src].bias += -learningRate * dest.deltaBack;
             }
 
-            // Data to be added into graph
-            lock(xAxisData)
+            //Data to be added into graph
+            if (ui.nnUIForm.graphUpdateOngoing == false)
             {
-                lock (yAxisData)
-                {
-                    Console.WriteLine("LOCK AQUIRED BY NN");
-                    xAxisData.Enqueue(inputCounter);
-                    yAxisData.Enqueue(totalError);
-                }
+                xAxisData.Enqueue(inputCounter);
+                yAxisData.Enqueue(totalError);
             }
-            Console.WriteLine("LOCK RELEASED BY NN");
-
             return totalError;
+        }
+
+        public void WaitTillDone()
+        {
+            while (UIThread.IsAlive)
+                Thread.Sleep(1000);
         }
 
     }

@@ -60,7 +60,7 @@ namespace NeuralNetwork_Caller
             double error = 0;
             Random gen = new Random();
 
-            for (int i = 0; i < 20; i++)
+            for (int i = 0; i < 2000; i++)
             {
                 error = 0;
                 double learningRate =0.01;
@@ -79,7 +79,7 @@ namespace NeuralNetwork_Caller
                 //if (displayOutput)
                 //    Console.WriteLine("Error : {0}", error);
             }
-            Thread.Sleep(1000);
+            nn.WaitTillDone();
             return error;
         }
     }
