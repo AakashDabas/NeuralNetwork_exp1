@@ -8,14 +8,23 @@ namespace Dabas.NeuralNetwork_UI
 {
     public class NeuralNetworkUI
     {
-        NNUIFORM nnUIForm;
+        public NNUIFORM nnUIForm;
+
+        public NeuralNetworkUI()
+        {
+            nnUIForm = new NNUIFORM();
+        }
 
         [STAThread]
         public void StartUI()
         {
-            nnUIForm = new NNUIFORM();
             Application.EnableVisualStyles();
             Application.Run(nnUIForm);
+        }
+
+        public void AddToChart(ref Queue<double> xAxisData, ref Queue<double> yAxisData)
+        {
+            nnUIForm.AddToChart(ref xAxisData, ref yAxisData);
         }
     }
 }

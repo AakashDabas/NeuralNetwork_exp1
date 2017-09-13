@@ -20,12 +20,12 @@ namespace Dabas.NeuralNewtork
 
         public NeuralNetwork(int[] NeuronCnt, TransferFuncType[] tFuncType, double weightRescaleFactor = 1)
         {
-            ui = new NeuralNetworkUI();
-            UIThread = new Thread(ui.StartUI);
-            UIThread.Start();
-
             xAxisData = new Queue<double>();
             yAxisData = new Queue<double>();
+            ui = new NeuralNetworkUI();
+            ui.AddToChart(ref xAxisData, ref yAxisData);
+            UIThread = new Thread(ui.StartUI);
+            UIThread.Start();
 
             if (NeuronCnt.Length != tFuncType.Length)
                 throw new Exception("Input size mismatch! Invalid input to NeuralNetwork Constructor");
@@ -126,7 +126,7 @@ namespace Dabas.NeuralNewtork
                 int currIdx = buffer.Dequeue();
                 Neuron.neurons[currIdx].deltaBack *= Neuron.neurons[currIdx].EvaluateDerivative();
                 Neuron neuron = Neuron.neurons[currIdx];
-                //Console.WriteLine("Neuron : {0}, Delta : {1}", neuron.neuronIdx, neuron.deltaBack);
+
                 foreach (int idx in neuron.incommingConnection)
                 {
                     Connection connection = Connection.connections[idx];
@@ -151,23 +151,25 @@ namespace Dabas.NeuralNewtork
                     connection.previousWeightDelta *= 0.5;
 
                 Connection.connections[connection.connectionIdx].weight += weightDelta + momentum * connection.previousWeightDelta;
-
                 Connection.connections[connection.connectionIdx].previousWeightDelta = connection.previousWeightDelta + weightDelta;
-
-                //if (displayOutput)
-                //{
-                //    Console.Write("Connection : {0} ", connection.connectionIdx);
-                //    Console.WriteLine("Current : {0}, Momentum : {1}", weightDelta, Connection.connections[connection.connectionIdx].previousWeightDelta);
-                //}
                 Neuron.neurons[connection.src].bias += -learningRate * dest.deltaBack;
             }
 
             // Data to be added into graph
-            xAxisData.Enqueue(inputCounter);
-            yAxisData.Enqueue(totalError);
+            lock(xAxisData)
+            {
+                lock (yAxisData)
+                {
+                    Console.WriteLine("LOCK AQUIRED BY NN");
+                    xAxisData.Enqueue(inputCounter);
+                    yAxisData.Enqueue(totalError);
+                }
+            }
+            Console.WriteLine("LOCK RELEASED BY NN");
 
             return totalError;
         }
+
     }
 
     public enum TransferFuncType

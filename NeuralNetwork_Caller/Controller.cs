@@ -12,7 +12,7 @@ namespace NeuralNetwork_Caller
     {
         static void Main(string[] args)
         {
-            test1();
+            test2();
             Console.WriteLine("Execution Completed : )\nPress Any Key To Continue");
             Console.ReadKey();
         }
@@ -50,33 +50,36 @@ namespace NeuralNetwork_Caller
 
         static double test2()
         {
-            NeuralNetwork nn = new NeuralNetwork(new int[] { 1, 5, 1 },
+            NeuralNetwork nn = new NeuralNetwork(new int[] { 1, 10, 10, 10, 1 },
                                                new TransferFuncType[] { TransferFuncType.NONE,
-                                               TransferFuncType.SIGMOID,
+                                               TransferFuncType.RATIONALSIGMOID,
+                                               TransferFuncType.RATIONALSIGMOID,
+                                               TransferFuncType.RATIONALSIGMOID,
                                                TransferFuncType.LINEAR});
 
             double error = 0;
+            Random gen = new Random();
 
             for (int i = 0; i < 20; i++)
             {
                 error = 0;
-                double learningRate =0.1;
-                double momentum = 0.05;
+                double learningRate =0.01;
+                double momentum = 0.01;
                 bool displayOutput = false;
-                if (i % 1 == 0)
-                {
-                    Console.WriteLine("__________");
-                    displayOutput = true;
-                }
+                //if (i % 1 == 0)
+                //{
+                //    Console.WriteLine("__________");
+                //    displayOutput = true;
+                //}
                 for(int j = 0; j < 25; j++)
                 {
-                    Random gen = new Random();
                     double input = 2 * gen.NextDouble() - 1;
                     error += nn.Train(new double[] { input }, new double[] { Math.Cos(input) }, learningRate, momentum, false);
                 }
-                if (displayOutput)
-                    Console.WriteLine("Error : {0}", error);
+                //if (displayOutput)
+                //    Console.WriteLine("Error : {0}", error);
             }
+            Thread.Sleep(1000);
             return error;
         }
     }
