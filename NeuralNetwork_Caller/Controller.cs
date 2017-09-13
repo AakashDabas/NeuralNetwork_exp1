@@ -60,7 +60,7 @@ namespace NeuralNetwork_Caller
             double error = 0;
             Random gen = new Random();
 
-            for (int i = 0; i < 2000; i++)
+            for (int i = 0; i < 20; i++)
             {
                 error = 0;
                 double learningRate =0.01;
@@ -73,7 +73,7 @@ namespace NeuralNetwork_Caller
                 //}
                 for(int j = 0; j < 25; j++)
                 {
-                    double input = 2 * gen.NextDouble() - 1;
+                    double input = 4 * gen.NextDouble() - 2;
                     error += nn.Train(new double[] { input }, new double[] { Math.Cos(input) }, learningRate, momentum, false);
                 }
                 //if (displayOutput)
