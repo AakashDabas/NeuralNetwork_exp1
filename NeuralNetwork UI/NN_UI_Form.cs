@@ -26,8 +26,10 @@ namespace Dabas.NeuralNetwork_UI
         private PictureBox upArrow;
         private PictureBox downArrow;
         public RichTextBox outputBox;
-        private Label label1;
         private Label label2;
+        public ProgressBar trainingProgressBar;
+        private Label trainingLabel;
+        public Label trainingPer;
 
         delegate void UpdateCall();
 
@@ -93,15 +95,17 @@ namespace Dabas.NeuralNetwork_UI
 
         private void InitializeComponent()
         {
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea4 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend4 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series4 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea2 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend2 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.errorGraph = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.downArrow = new System.Windows.Forms.PictureBox();
             this.upArrow = new System.Windows.Forms.PictureBox();
             this.outputBox = new System.Windows.Forms.RichTextBox();
-            this.label1 = new System.Windows.Forms.Label();
             this.label2 = new System.Windows.Forms.Label();
+            this.trainingProgressBar = new System.Windows.Forms.ProgressBar();
+            this.trainingLabel = new System.Windows.Forms.Label();
+            this.trainingPer = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.errorGraph)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.downArrow)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.upArrow)).BeginInit();
@@ -118,17 +122,17 @@ namespace Dabas.NeuralNetwork_UI
             this.errorGraph.BorderlineColor = System.Drawing.Color.DimGray;
             this.errorGraph.BorderlineDashStyle = System.Windows.Forms.DataVisualization.Charting.ChartDashStyle.Solid;
             this.errorGraph.BorderlineWidth = 2;
-            chartArea4.Name = "ChartArea1";
-            this.errorGraph.ChartAreas.Add(chartArea4);
-            legend4.Name = "Legend1";
-            this.errorGraph.Legends.Add(legend4);
+            chartArea2.Name = "ChartArea1";
+            this.errorGraph.ChartAreas.Add(chartArea2);
+            legend2.Name = "Legend1";
+            this.errorGraph.Legends.Add(legend2);
             this.errorGraph.Location = new System.Drawing.Point(17, 204);
             this.errorGraph.Name = "errorGraph";
-            series4.ChartArea = "ChartArea1";
-            series4.Legend = "Legend1";
-            series4.Name = "Series1";
-            this.errorGraph.Series.Add(series4);
-            this.errorGraph.Size = new System.Drawing.Size(951, 445);
+            series2.ChartArea = "ChartArea1";
+            series2.Legend = "Legend1";
+            series2.Name = "Series1";
+            this.errorGraph.Series.Add(series2);
+            this.errorGraph.Size = new System.Drawing.Size(945, 445);
             this.errorGraph.TabIndex = 5;
             this.errorGraph.Text = "errorGraph";
             // 
@@ -176,16 +180,6 @@ namespace Dabas.NeuralNetwork_UI
             this.outputBox.TabIndex = 8;
             this.outputBox.Text = "";
             // 
-            // label1
-            // 
-            this.label1.AutoSize = true;
-            this.label1.ForeColor = System.Drawing.Color.Black;
-            this.label1.Location = new System.Drawing.Point(14, 183);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(155, 16);
-            this.label1.TabIndex = 9;
-            this.label1.Text = "Avg Error Vs Iteration";
-            // 
             // label2
             // 
             this.label2.AutoSize = true;
@@ -196,12 +190,50 @@ namespace Dabas.NeuralNetwork_UI
             this.label2.TabIndex = 10;
             this.label2.Text = "OUTPUT";
             // 
+            // trainingProgressBar
+            // 
+            this.trainingProgressBar.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.trainingProgressBar.Location = new System.Drawing.Point(115, 174);
+            this.trainingProgressBar.Name = "trainingProgressBar";
+            this.trainingProgressBar.Size = new System.Drawing.Size(847, 25);
+            this.trainingProgressBar.Step = 1;
+            this.trainingProgressBar.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
+            this.trainingProgressBar.TabIndex = 11;
+            // 
+            // trainingLabel
+            // 
+            this.trainingLabel.AutoSize = true;
+            this.trainingLabel.BackColor = System.Drawing.Color.Transparent;
+            this.trainingLabel.ForeColor = System.Drawing.Color.Black;
+            this.trainingLabel.Location = new System.Drawing.Point(13, 176);
+            this.trainingLabel.Name = "trainingLabel";
+            this.trainingLabel.Size = new System.Drawing.Size(80, 16);
+            this.trainingLabel.TabIndex = 12;
+            this.trainingLabel.Text = "TRAINING";
+            // 
+            // trainingPer
+            // 
+            this.trainingPer.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.trainingPer.AutoSize = true;
+            this.trainingPer.BackColor = System.Drawing.Color.Transparent;
+            this.trainingPer.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.trainingPer.ForeColor = System.Drawing.Color.Black;
+            this.trainingPer.Location = new System.Drawing.Point(507, 179);
+            this.trainingPer.Name = "trainingPer";
+            this.trainingPer.Size = new System.Drawing.Size(27, 16);
+            this.trainingPer.TabIndex = 13;
+            this.trainingPer.Text = "0%";
+            // 
             // NNUIFORM
             // 
             this.BackColor = System.Drawing.Color.White;
             this.ClientSize = new System.Drawing.Size(984, 661);
+            this.Controls.Add(this.trainingPer);
+            this.Controls.Add(this.trainingLabel);
+            this.Controls.Add(this.trainingProgressBar);
             this.Controls.Add(this.label2);
-            this.Controls.Add(this.label1);
             this.Controls.Add(this.outputBox);
             this.Controls.Add(this.downArrow);
             this.Controls.Add(this.upArrow);
@@ -276,5 +308,6 @@ namespace Dabas.NeuralNetwork_UI
             this.xAxisData = xAxisData;
             this.yAxisData = yAxisData;
         }
+
     }
 }

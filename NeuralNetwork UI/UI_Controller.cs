@@ -9,7 +9,8 @@ namespace Dabas.NeuralNetwork_UI
     public class NeuralNetworkUI
     {
         public NNUIFORM nnUIForm;
-        delegate void InvokeHelper(string text);
+        delegate void InvokeHelperStr1(string text);
+        delegate void InvokeHelperInt2(int a, int b);
 
         public NeuralNetworkUI()
         {
@@ -32,12 +33,37 @@ namespace Dabas.NeuralNetwork_UI
         {
             if (nnUIForm.outputBox.InvokeRequired)
             {
-                nnUIForm.outputBox.Invoke(new InvokeHelper(RegisterOutput), text);
+                nnUIForm.outputBox.Invoke(new InvokeHelperStr1(RegisterOutput), text);
             }
             else
             {
                 nnUIForm.outputBox.Text += System.DateTime.Now.ToString() + " | " + text + "\n";
             }
+        }
+
+        public void SetProgressBar(int cntTrainingDone, int cntTotalTraining)
+        {
+            if (nnUIForm.trainingProgressBar.InvokeRequired)
+                nnUIForm.trainingProgressBar.Invoke(new InvokeHelperInt2(SetProgressBar), cntTrainingDone, cntTotalTraining);
+            else
+            {
+                nnUIForm.trainingProgressBar.Maximum = cntTotalTraining;
+                nnUIForm.trainingProgressBar.Value = cntTrainingDone;
+                SetTrainingPercentange(cntTrainingDone, cntTotalTraining);
+            }
+            
+        }
+
+        public void SetTrainingPercentange(int cntTrainingDone, int cntTotalTraining)
+        {
+            if (nnUIForm.trainingPer.InvokeRequired)
+                nnUIForm.trainingPer.Invoke(new InvokeHelperInt2(SetProgressBar), cntTrainingDone, cntTotalTraining);
+            else
+            {
+                double percentage = (double)cntTrainingDone / (double)cntTotalTraining * 100;
+                nnUIForm.trainingPer.Text = string.Format("{0:0.0000} %", percentage);
+            }
+
         }
     }
 }

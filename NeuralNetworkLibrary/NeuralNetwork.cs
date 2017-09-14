@@ -10,7 +10,7 @@ namespace Dabas.NeuralNewtork
 {
     public class NeuralNetwork
     {
-        int inputCounter = 0;
+        public int trainingCounter = 0, cntTotalTraining = 0;
         Layer inputLayer, outputLayer;
         Thread UIThread;
 
@@ -18,12 +18,13 @@ namespace Dabas.NeuralNewtork
         // To store graph data
         Queue<double> xAxisData, yAxisData;
 
-        public NeuralNetwork(int[] NeuronCnt, TransferFuncType[] tFuncType, double weightRescaleFactor = 1, bool showNNUI = true)
+        public NeuralNetwork(int[] NeuronCnt, TransferFuncType[] tFuncType, int totalTrainingData, double weightRescaleFactor = 1, bool showNNUI = true)
         {
             xAxisData = new Queue<double>();
             yAxisData = new Queue<double>();
             ui = new NeuralNetworkUI();
             ui.AddToChart(ref xAxisData, ref yAxisData);
+            cntTotalTraining = totalTrainingData;
             UIThread = new Thread(ui.StartUI);
             if(showNNUI)
                 UIThread.Start();
@@ -98,7 +99,7 @@ namespace Dabas.NeuralNewtork
 
         public double Train(double[] input, double[] output, double learningRate, double momentum, bool displayOutput)
         {
-            inputCounter++;
+            trainingCounter++;
             // Check for valid input
             if (input.Length != inputLayer.cntNeurons || output.Length != outputLayer.cntNeurons)
                 throw new Exception("Input and layer size mismatch! Invalid input given to NeuralNetwork.Train()");
@@ -160,8 +161,9 @@ namespace Dabas.NeuralNewtork
             //Data to be added into graph
             if (ui.nnUIForm.graphUpdateOngoing == false)
             {
-                xAxisData.Enqueue(inputCounter);
+                xAxisData.Enqueue(trainingCounter);
                 yAxisData.Enqueue(totalError);
+                ui.SetProgressBar(trainingCounter, cntTotalTraining);
             }
             return totalError;
         }
