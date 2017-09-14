@@ -5,7 +5,7 @@
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
     <ProjectGuid>{18414205-798F-459A-AFD8-95DFF3DC1645}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <OutputType>WinExe</OutputType>
     <RootNamespace>NeuralNetwork_Caller</RootNamespace>
     <AssemblyName>NeuralNetwork_Caller</AssemblyName>
     <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>

@@ -27,7 +27,6 @@ namespace Dabas.NeuralNewtork
             UIThread = new Thread(ui.StartUI);
             if(showNNUI)
                 UIThread.Start();
-
             if (NeuronCnt.Length != tFuncType.Length)
                 throw new Exception("Input size mismatch! Invalid input to NeuralNetwork Constructor");
 
@@ -52,6 +51,8 @@ namespace Dabas.NeuralNewtork
                 else if (lType == LayerType.OUTPUT)
                     outputLayer = currentLayer;
             }
+
+            RegisterOutput("Neural Network Ready");
         }
 
         public void Run(double[] input, bool displayOutput)
@@ -89,9 +90,9 @@ namespace Dabas.NeuralNewtork
             // Output Layer
             if (displayOutput)
             {
-                Console.WriteLine("OUTPUT: ");
+                RegisterOutput("OUTPUT: ");
                 for (int itr = 0; itr < outputLayer.cntNeurons; itr++)
-                    Console.WriteLine(Neuron.neurons[itr + outputLayer.startIdx].output);
+                    RegisterOutput(Neuron.neurons[itr + outputLayer.startIdx].output.ToString());
             }
         }
 
@@ -169,6 +170,11 @@ namespace Dabas.NeuralNewtork
         {
             while (UIThread.IsAlive)
                 Thread.Sleep(1000);
+        }
+
+        public void RegisterOutput(string text)
+        {
+            ui.RegisterOutput(text);
         }
 
     }

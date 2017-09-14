@@ -13,8 +13,8 @@ namespace NeuralNetwork_Caller
         static void Main(string[] args)
         {
             test2();
-            Console.WriteLine("Execution Completed : )\nPress Any Key To Continue");
-            Console.ReadKey();
+            //Console.WriteLine("Execution Completed : )\nPress Any Key To Continue");
+            //Console.ReadKey();
         }
 
         static double test1()
@@ -66,18 +66,18 @@ namespace NeuralNetwork_Caller
                 double learningRate =0.01;
                 double momentum = 0.01;
                 bool displayOutput = false;
-                //if (i % 1 == 0)
-                //{
-                //    Console.WriteLine("__________");
-                //    displayOutput = true;
-                //}
-                for(int j = 0; j < 25; j++)
+                if (i % 1 == 0)
+                {
+                    nn.RegisterOutput("__________");
+                    displayOutput = true;
+                }
+                for (int j = 0; j < 25; j++)
                 {
                     double input = 4 * gen.NextDouble() - 2;
                     error += nn.Train(new double[] { input }, new double[] { Math.Cos(input) }, learningRate, momentum, false);
                 }
-                //if (displayOutput)
-                //    Console.WriteLine("Error : {0}", error);
+                if (displayOutput)
+                    nn.RegisterOutput(string.Format("Error : {0}", error));
             }
             nn.WaitTillDone();
             return error;

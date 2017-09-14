@@ -25,7 +25,7 @@ namespace Dabas.NeuralNetwork_UI
         private Chart errorGraph;
         private PictureBox upArrow;
         private PictureBox downArrow;
-        private RichTextBox outputBox;
+        public RichTextBox outputBox;
         private Label label1;
         private Label label2;
 
@@ -89,19 +89,13 @@ namespace Dabas.NeuralNetwork_UI
             errorGraph.ChartAreas.Add(chartArea);
             errorGraph.Series.Add(series);
 
-            for (int i = 0; i < 100; i++)
-            {
-                outputBox.Text += "\nTangoCharle";
-                outputBox.Text += "\nAakash Dabas";
-            }
-
         }
 
         private void InitializeComponent()
         {
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea3 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend3 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series3 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea4 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend4 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series series4 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.errorGraph = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.downArrow = new System.Windows.Forms.PictureBox();
             this.upArrow = new System.Windows.Forms.PictureBox();
@@ -124,17 +118,17 @@ namespace Dabas.NeuralNetwork_UI
             this.errorGraph.BorderlineColor = System.Drawing.Color.DimGray;
             this.errorGraph.BorderlineDashStyle = System.Windows.Forms.DataVisualization.Charting.ChartDashStyle.Solid;
             this.errorGraph.BorderlineWidth = 2;
-            chartArea3.Name = "ChartArea1";
-            this.errorGraph.ChartAreas.Add(chartArea3);
-            legend3.Name = "Legend1";
-            this.errorGraph.Legends.Add(legend3);
+            chartArea4.Name = "ChartArea1";
+            this.errorGraph.ChartAreas.Add(chartArea4);
+            legend4.Name = "Legend1";
+            this.errorGraph.Legends.Add(legend4);
             this.errorGraph.Location = new System.Drawing.Point(17, 204);
             this.errorGraph.Name = "errorGraph";
-            series3.ChartArea = "ChartArea1";
-            series3.Legend = "Legend1";
-            series3.Name = "Series1";
-            this.errorGraph.Series.Add(series3);
-            this.errorGraph.Size = new System.Drawing.Size(951, 526);
+            series4.ChartArea = "ChartArea1";
+            series4.Legend = "Legend1";
+            series4.Name = "Series1";
+            this.errorGraph.Series.Add(series4);
+            this.errorGraph.Size = new System.Drawing.Size(951, 445);
             this.errorGraph.TabIndex = 5;
             this.errorGraph.Text = "errorGraph";
             // 
@@ -168,21 +162,25 @@ namespace Dabas.NeuralNetwork_UI
             // 
             // outputBox
             // 
-            this.outputBox.BackColor = System.Drawing.Color.GhostWhite;
-            this.outputBox.BorderStyle = System.Windows.Forms.BorderStyle.None;
-            this.outputBox.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.outputBox.ForeColor = System.Drawing.Color.Coral;
+            this.outputBox.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.outputBox.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(64)))));
+            this.outputBox.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.outputBox.Font = new System.Drawing.Font("Consolas", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.outputBox.ForeColor = System.Drawing.Color.White;
             this.outputBox.Location = new System.Drawing.Point(12, 28);
+            this.outputBox.MinimumSize = new System.Drawing.Size(950, 140);
             this.outputBox.Name = "outputBox";
-            this.outputBox.Size = new System.Drawing.Size(951, 145);
+            this.outputBox.ReadOnly = true;
+            this.outputBox.Size = new System.Drawing.Size(950, 140);
             this.outputBox.TabIndex = 8;
             this.outputBox.Text = "";
             // 
             // label1
             // 
             this.label1.AutoSize = true;
-            this.label1.ForeColor = System.Drawing.Color.OrangeRed;
-            this.label1.Location = new System.Drawing.Point(14, 185);
+            this.label1.ForeColor = System.Drawing.Color.Black;
+            this.label1.Location = new System.Drawing.Point(14, 183);
             this.label1.Name = "label1";
             this.label1.Size = new System.Drawing.Size(155, 16);
             this.label1.TabIndex = 9;
@@ -191,7 +189,7 @@ namespace Dabas.NeuralNetwork_UI
             // label2
             // 
             this.label2.AutoSize = true;
-            this.label2.ForeColor = System.Drawing.Color.OrangeRed;
+            this.label2.ForeColor = System.Drawing.Color.Black;
             this.label2.Location = new System.Drawing.Point(14, 7);
             this.label2.Name = "label2";
             this.label2.Size = new System.Drawing.Size(71, 16);
@@ -200,8 +198,8 @@ namespace Dabas.NeuralNetwork_UI
             // 
             // NNUIFORM
             // 
-            this.BackColor = System.Drawing.Color.Black;
-            this.ClientSize = new System.Drawing.Size(984, 742);
+            this.BackColor = System.Drawing.Color.White;
+            this.ClientSize = new System.Drawing.Size(984, 661);
             this.Controls.Add(this.label2);
             this.Controls.Add(this.label1);
             this.Controls.Add(this.outputBox);
