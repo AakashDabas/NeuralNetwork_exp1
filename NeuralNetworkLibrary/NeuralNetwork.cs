@@ -11,6 +11,8 @@ namespace Dabas.NeuralNewtork
     public class NeuralNetwork
     {
         public int trainingCounter = 0, cntTotalTraining = 0;
+        Queue<double> prevErrors = new Queue<double>();
+        double prevErrorSum = 0;
         Layer inputLayer, outputLayer;
         Thread UIThread;
 
@@ -26,7 +28,7 @@ namespace Dabas.NeuralNewtork
             ui.AddToChart(ref xAxisData, ref yAxisData);
             cntTotalTraining = totalTrainingData;
             UIThread = new Thread(ui.StartUI);
-            if(showNNUI)
+            if (showNNUI)
                 UIThread.Start();
             if (NeuronCnt.Length != tFuncType.Length)
                 throw new Exception("Input size mismatch! Invalid input to NeuralNetwork Constructor");
@@ -158,12 +160,18 @@ namespace Dabas.NeuralNewtork
                 Neuron.neurons[connection.src].bias += -learningRate * dest.deltaBack;
             }
 
-            //Data to be added into graph
+            //To Update UI
             if (ui.nnUIForm.graphUpdateOngoing == false)
             {
-                xAxisData.Enqueue(trainingCounter);
-                yAxisData.Enqueue(totalError);
                 ui.SetProgressBar(trainingCounter, cntTotalTraining);
+                if (prevErrors.Count == 100)
+                {
+                    prevErrorSum -= prevErrors.Dequeue();
+                }
+                prevErrors.Enqueue(totalError);
+                prevErrorSum += totalError;
+                xAxisData.Enqueue(trainingCounter);
+                yAxisData.Enqueue(prevErrorSum / prevErrors.Count);
             }
             return totalError;
         }
@@ -190,7 +198,8 @@ namespace Dabas.NeuralNewtork
         GAUSSIAN,
         TANH,
         LINEAR,
-        RECTILINEAR
+        RECTILINEAR,
+        SOFTMAX
     }
 
     public enum LayerType
@@ -221,10 +230,7 @@ namespace Dabas.NeuralNewtork
 
     class Neuron
     {
-        public double input;
-        public double output;
-        public double deltaBack;
-        public double bias;
+        public double input, output, deltaBack, bias;
         public int neuronIdx;
         public List<int> incommingConnection, outgoingConnection;
         TransferFuncType tFuncType;
@@ -276,6 +282,8 @@ namespace Dabas.NeuralNewtork
 
         public double EvaluateDerivative()
         {
+            if (tFuncType == TransferFuncType.SIGMOID)
+                return output * (1 - output);
             return TransferFunction.EvaluateDerivate(tFuncType, input);
         }
 

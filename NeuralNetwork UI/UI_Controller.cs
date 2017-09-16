@@ -51,7 +51,6 @@ namespace Dabas.NeuralNetwork_UI
                 nnUIForm.trainingProgressBar.Value = cntTrainingDone;
                 SetTrainingPercentange(cntTrainingDone, cntTotalTraining);
             }
-            
         }
 
         public void SetTrainingPercentange(int cntTrainingDone, int cntTotalTraining)

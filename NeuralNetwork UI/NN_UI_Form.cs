@@ -41,7 +41,7 @@ namespace Dabas.NeuralNetwork_UI
 
             graphUpdateTimer = new System.Timers.Timer();
             graphUpdateTimer.Enabled = true;
-            graphUpdateTimer.Interval = 1000;
+            graphUpdateTimer.Interval = 100;
             graphUpdateTimer.Elapsed += new ElapsedEventHandler(graphUpdateTimer_Tick);
             graphUpdateTimer.Start();
             errorGraph.Titles.Clear();
@@ -69,7 +69,7 @@ namespace Dabas.NeuralNetwork_UI
             {
                 Name = "Error",
                 Color = Color.Plum,
-                BorderWidth = 2,
+                BorderWidth = 1,
                 ChartType = SeriesChartType.Line,
                 IsVisibleInLegend = true
             };

@@ -5,6 +5,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Dabas.NeuralNewtork;
 using System.Threading;
+using System.IO;
 
 namespace NeuralNetwork_Caller
 {
@@ -12,7 +13,7 @@ namespace NeuralNetwork_Caller
     {
         static void Main(string[] args)
         {
-            test2();
+            test3();
             //Console.WriteLine("Execution Completed : )\nPress Any Key To Continue");
             //Console.ReadKey();
         }
@@ -79,6 +80,86 @@ namespace NeuralNetwork_Caller
                     nn.RegisterOutput(string.Format("Error : {0}", error));
             }
             nn.WaitTillDone();
+            return error;
+        }
+
+        public static int ReadInt(ref byte[] bytes, ref int idx)
+        {
+            int output = 0;
+            for (int i = 0; i < 4; i++)
+            {
+                output <<= 8;
+                output |= bytes[idx + i];
+            }
+            idx += 4;
+            return output;
+        }
+
+        static double test3()
+        {
+            int limit = 0;
+            int height, width;
+            Dictionary<int, byte[,]> data = new Dictionary<int, byte[,]>();
+            Dictionary<int, byte> label = new Dictionary<int, byte>();
+
+            // Read Data
+            byte[] imgBytes = File.ReadAllBytes(@"train-images.idx3-ubyte");
+            byte[] labelBytes = File.ReadAllBytes(@"train-labels.idx1-ubyte");
+            int idx1 = 0, idx2 = 8;
+            int magicNumber = ReadInt(ref imgBytes, ref idx1);
+            limit = ReadInt(ref imgBytes, ref idx1);
+            height = ReadInt(ref imgBytes, ref idx1);
+            width = ReadInt(ref imgBytes, ref idx1);
+
+            for (int i = 0; i < limit; i++)
+            {
+                data[i] = new byte[height, width];
+                label[i] = labelBytes[idx2++];
+                for (int j = 0; j < height; j++)
+                    for (int k = 0; k < width; k++)
+                    {
+                        data[i][j, k] = imgBytes[idx1++];
+                    }
+            }
+
+
+            NeuralNetwork nn = new NeuralNetwork(new int[] { height * width, 10},
+                                              new TransferFuncType[] { TransferFuncType.NONE,
+                                                TransferFuncType.SIGMOID }, limit, 100);
+
+            double error = 0;
+
+            for (int i = 0; i < limit; i++)
+            {
+                error = 0;
+                double learningRate = 0.002;
+                double momentum = 0.001;
+                bool displayOutput = false;
+                if (i % (limit > 10 ? limit / 1000 : 1) == 0)
+                {
+                    nn.RegisterOutput("_____________");
+                    displayOutput = true;
+                }
+
+                double[] input = new double[height * width];
+
+                for(int j= 0; j < height; j++)
+                    for(int k = 0; k < width; k++)
+                        input[j * width + k] = data[i][j, k] / 255.0;
+
+                double[] output = new double[10];
+                for (int j = 0; j < 10; j++)
+                    output[j] = 0;
+                output[label[i]] = 1;
+
+                if (displayOutput)
+                    nn.RegisterOutput(string.Format("Label: {0}", label[i]));
+
+                error = nn.Train(input, output, learningRate, momentum, displayOutput);
+
+                if (displayOutput)
+                    nn.RegisterOutput(string.Format("Error : {0}", error));
+            }
             return error;
         }
     }
