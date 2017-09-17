@@ -5,12 +5,14 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Dabas.NeuralNetwork_UI;
+using System.IO;
+using System.Xml;
 
 namespace Dabas.NeuralNewtork
 {
     public class NeuralNetwork
     {
-        public int trainingCounter = 0, cntTotalTraining = 0;
+        public int trainingCounter = 0;
         Queue<double> prevErrors = new Queue<double>();
         double prevErrorSum = 0;
 
@@ -24,13 +26,26 @@ namespace Dabas.NeuralNewtork
         // To store graph data
         Queue<double> xAxisData, yAxisData;
 
-        public NeuralNetwork(int[] layersCnt, TransferFuncType[] tFuncType, int totalTrainingData, double weightRescaleFactor = 1, bool showNNUI = true)
+        NeuralNetworkArgs args;
+
+        class NeuralNetworkArgs
         {
+            public int[] layersCnt;
+            public TransferFuncType[] tFuncType;
+            public int intendedTrainingCnt = 0;
+        }
+
+        public NeuralNetwork(int[] layersCnt, TransferFuncType[] tFuncType, int intendedTrainingCnt = 1, double weightRescaleFactor = 1, bool showNNUI = true)
+        {
+            args = new NeuralNetworkArgs();
+            args.layersCnt = layersCnt;
+            args.tFuncType = tFuncType;
+            args.intendedTrainingCnt = intendedTrainingCnt;
+
             xAxisData = new Queue<double>();
             yAxisData = new Queue<double>();
             ui = new NeuralNetworkUI();
             ui.AddToChart(ref xAxisData, ref yAxisData);
-            cntTotalTraining = totalTrainingData;
             UIThread = new Thread(ui.StartUI);
             if (showNNUI)
                 UIThread.Start();
@@ -53,7 +68,7 @@ namespace Dabas.NeuralNewtork
                 layers.Add(currentLayer);
             }
 
-            RegisterOutput("Neural Network Ready");
+            RegisterOutput("Neural Network Initialized");
         }
 
         public void Run(double[] input, bool displayOutput)
@@ -65,7 +80,7 @@ namespace Dabas.NeuralNewtork
             Neuron.Reset(ref neurons);
             // Initialize input neurons
             Queue<int> buffer = new Queue<int>();
-            foreach(int idx in layers[0].neuronIdxs)
+            foreach (int idx in layers[0].neuronIdxs)
             {
                 neurons[idx].input = input[idx];
                 buffer.Enqueue(idx);
@@ -92,7 +107,7 @@ namespace Dabas.NeuralNewtork
             if (displayOutput)
             {
                 RegisterOutput("OUTPUT: ");
-                foreach(int idx in layers.Last().neuronIdxs)
+                foreach (int idx in layers.Last().neuronIdxs)
                     RegisterOutput(neurons[idx].output.ToString());
             }
         }
@@ -160,7 +175,7 @@ namespace Dabas.NeuralNewtork
             //To Update UI
             ui.nnUIForm.graphUpdateSemaphore.WaitOne();
             {
-                ui.SetProgressBar(trainingCounter, cntTotalTraining);
+                ui.SetProgressBar(trainingCounter, args.intendedTrainingCnt);
                 if (prevErrors.Count == 100)
                 {
                     prevErrorSum -= prevErrors.Dequeue();
@@ -185,6 +200,147 @@ namespace Dabas.NeuralNewtork
             ui.RegisterOutput(text);
         }
 
+        public void Save(string filePath, string networkName)
+        {
+            XmlWriter writer;
+            XmlWriterSettings writerSettings = new XmlWriterSettings
+            {
+                Indent = true,
+                IndentChars = "     ",
+                NewLineOnAttributes = false,
+                OmitXmlDeclaration = true
+            };
+
+            try
+            {
+                writer = XmlWriter.Create(filePath, writerSettings);
+            }
+            catch
+            {
+                throw new Exception("Invalid filepath given to NeuralNetwork.Save() !");
+            }
+
+            writer.WriteStartElement("NeuralNetwork");
+
+            writer.WriteAttributeString("Time", DateTime.Now.ToString());
+            writer.WriteAttributeString("IndendedTrainingCnt", args.intendedTrainingCnt.ToString());
+            writer.WriteAttributeString("TrainingDone", trainingCounter.ToString());
+            writer.WriteAttributeString("Name", networkName);
+
+            writer.WriteStartElement("Layers");
+            writer.WriteAttributeString("Count", args.layersCnt.Length.ToString());
+            for (int i = 0; i < args.layersCnt.Length; i++)
+            {
+                writer.WriteStartElement("Layer");
+                writer.WriteAttributeString("Type", args.tFuncType[i].ToString());
+                writer.WriteAttributeString("Neurons", args.layersCnt[i].ToString());
+                writer.WriteAttributeString("Index", i.ToString());
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement(); // Layers
+
+            writer.WriteStartElement("Neurons");
+            writer.WriteAttributeString("Count", neurons.Values.Count.ToString());
+            foreach(Neuron neuron in neurons.Values)
+            {
+                writer.WriteStartElement("Neuron");
+                writer.WriteAttributeString("Bias", neuron.bias.ToString());
+                writer.WriteAttributeString("Index", neuron.neuronIdx.ToString());
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement(); // Neurons
+
+            writer.WriteStartElement("Connections");
+            writer.WriteAttributeString("Count", connections.Values.Count.ToString());
+            foreach (Connection connection in connections.Values)
+            {
+                writer.WriteStartElement("Connection");
+                writer.WriteAttributeString("PreviousWeightDelta", connection.previousWeightDelta.ToString());
+                writer.WriteAttributeString("Destination", connection.dest.ToString());
+                writer.WriteAttributeString("Source", connection.src.ToString());
+                writer.WriteAttributeString("Weight", connection.weight.ToString());
+                writer.WriteAttributeString("Index", connection.connectionIdx.ToString());
+                writer.WriteEndElement();
+            }
+            writer.WriteEndElement(); // Connections
+
+            writer.WriteEndElement();// Neural Network Args
+
+            writer.Flush();
+            writer.Close();
+
+            this.RegisterOutput("Saved Neural Network : " + networkName);
+        }
+
+        public static NeuralNetwork Load(string filePath, bool showNNUI = false)
+        {
+            XmlDocument doc = new XmlDocument();
+            try
+            {
+                doc.Load(filePath);
+            }
+            catch
+            {
+                throw new Exception("Invalid filepath given to NeuralNetwork.Load() !");
+            }
+
+            int trainingCounter;
+            int layerCnt = 0;
+            NeuralNetworkArgs args = new NeuralNetworkArgs();
+
+            string basePath = "NeuralNetwork/";
+            int.TryParse(XPathValue(basePath + "@TrainingDone", ref doc), out trainingCounter);
+            int.TryParse(XPathValue(basePath + "@IndendedTrainingCnt", ref doc), out args.intendedTrainingCnt);
+            basePath += "Layers/";
+
+            int.TryParse(XPathValue(basePath + "@Count", ref doc), out layerCnt);
+            args.layersCnt = new int[layerCnt];
+            args.tFuncType = new TransferFuncType[layerCnt];
+
+            basePath += "Layer[@Index='{0}']/@{1}";
+            for(int i = 0; i < layerCnt; i++)
+            {
+                int.TryParse(XPathValue(string.Format(basePath, i.ToString(), "Neurons"), ref doc), out args.layersCnt[i]);
+                Enum.TryParse<TransferFuncType>(XPathValue(string.Format(basePath, i.ToString(), "Type"), ref doc), out args.tFuncType[i]);
+            }
+
+            NeuralNetwork nn = new NeuralNetwork(args.layersCnt, args.tFuncType, args.intendedTrainingCnt, 1, showNNUI);
+            int.TryParse(XPathValue("NeuralNetwork/@TrainingDone", ref doc), out nn.trainingCounter);
+
+            nn.RegisterOutput("Loading Neurons");
+            basePath = "NeuralNetwork/Neurons/Neuron[@Index='{0}']/@Bias";
+            int neuronCnt;
+            int.TryParse(XPathValue("NeuralNetwork/Neurons/@Count", ref doc), out neuronCnt);
+            for(int i = 0; i < neuronCnt; i++)
+            {
+                double.TryParse(XPathValue(string.Format(basePath, i.ToString()), ref doc), out nn.neurons[i].bias);
+            }
+            nn.RegisterOutput("Loading Connections");
+            basePath = "NeuralNetwork/Connections/Connection[@Index='{0}']/@{1}";
+            int connectionCnt;
+            int.TryParse(XPathValue("NeuralNetwork/Connections/@Count", ref doc), out connectionCnt);
+            for (int i = 0; i < connectionCnt; i++)
+            {
+                double.TryParse(XPathValue(string.Format(basePath, i.ToString(), "Weight"), ref doc), out nn.connections[i].weight);
+                double.TryParse(XPathValue(string.Format(basePath, i.ToString(), "PreviousWeightDelta"), ref doc), out nn.connections[i].previousWeightDelta);
+                double completed = (i + 1) * 100.0 / connectionCnt;
+                if (completed == 25 || completed == 50 || completed == 75 || completed == 100)
+                {
+                    nn.RegisterOutput("Connections Loaded : " + completed + "%");
+                }
+            }
+            nn.RegisterOutput("Neural Network : " + XPathValue("NeuralNetwork/@Name", ref doc) + "Loaded Successfully : )");
+            doc = null;
+            return nn;
+        }
+
+        private static string XPathValue(string xPath, ref XmlDocument doc)
+        {
+            XmlNode node = doc.SelectSingleNode(xPath);
+            if (node == null)
+                throw new Exception("Invalid XPath given to NeuralNetwork.XPathValue() !");
+            return node.InnerText;
+        }
     }
 
     public enum TransferFuncType
@@ -295,7 +451,7 @@ namespace Dabas.NeuralNewtork
         public int connectionIdx;
 
         public Connection(ref Dictionary<int, Neuron> neurons, ref int neuronCounter,
-            ref Dictionary<int, Connection> connections, ref int connectionCounter, 
+            ref Dictionary<int, Connection> connections, ref int connectionCounter,
             double weightRescaleFactor = 1)
         {
             weight = Gaussian.GetRandomGaussian() / weightRescaleFactor;

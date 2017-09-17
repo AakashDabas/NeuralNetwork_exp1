@@ -97,6 +97,7 @@ namespace NeuralNetwork_Caller
 
         static double test3()
         {
+            //
             int limit = 0;
             int height, width;
             Dictionary<int, byte[,]> data = new Dictionary<int, byte[,]>();
@@ -123,17 +124,15 @@ namespace NeuralNetwork_Caller
             }
 
 
-            NeuralNetwork nn = new NeuralNetwork(new int[] { height * width, 10},
-                                              new TransferFuncType[] { TransferFuncType.NONE,
-                                                TransferFuncType.SIGMOID }, limit, 100);
+            NeuralNetwork nn = NeuralNetwork.Load("Testing.xml", true);
 
             double error = 0;
 
-            for (int i = 0; i < limit; i++)
+            for (int i = nn.trainingCounter; i < limit; i++)
             {
                 error = 0;
-                double learningRate = 0.05;
-                double momentum = 0.05;
+                double learningRate = 0.001;
+                double momentum = 0.1;
                 bool displayOutput = false;
                 if (i % (limit > 10 ? limit / 1000 : 1) == 0)
                 {
@@ -159,7 +158,11 @@ namespace NeuralNetwork_Caller
 
                 if (displayOutput)
                     nn.RegisterOutput(string.Format("Error : {0}", error));
+
+                if (i % 1000 == 0 && i != 0)
+                    nn.Save("Testing.xml", "Testin01");
             }
+            nn.Save("Testing.xml", "DigitRecognizer");
             return error;
         }
     }
