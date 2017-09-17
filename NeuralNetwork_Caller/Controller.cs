@@ -132,8 +132,8 @@ namespace NeuralNetwork_Caller
             for (int i = 0; i < limit; i++)
             {
                 error = 0;
-                double learningRate = 0.002;
-                double momentum = 0.001;
+                double learningRate = 0.05;
+                double momentum = 0.05;
                 bool displayOutput = false;
                 if (i % (limit > 10 ? limit / 1000 : 1) == 0)
                 {

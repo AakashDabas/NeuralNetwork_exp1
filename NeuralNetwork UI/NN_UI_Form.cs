@@ -19,31 +19,31 @@ namespace Dabas.NeuralNetwork_UI
         ChartArea chartArea;
         Series series;
         Queue<double> xAxisData, yAxisData;
-        System.Timers.Timer graphUpdateTimer;
+        System.Timers.Timer updateTimer;
         double zoomScale = 1;
+        public string outputText = "";
+        Semaphore textUpdateSemaphore = new Semaphore(1, 1);
+        public Semaphore graphUpdateSemaphore = new Semaphore(1, 1);
+
+        delegate void UpdateCall();
 
         private Chart errorGraph;
         private PictureBox upArrow;
         private PictureBox downArrow;
         public RichTextBox outputBox;
-        private Label label2;
         public ProgressBar trainingProgressBar;
         private Label trainingLabel;
         public Label trainingPer;
 
-        delegate void UpdateCall();
-
-        public bool graphUpdateOngoing = false;
 
         public NNUIFORM()
         {
             InitializeComponent();
-
-            graphUpdateTimer = new System.Timers.Timer();
-            graphUpdateTimer.Enabled = true;
-            graphUpdateTimer.Interval = 100;
-            graphUpdateTimer.Elapsed += new ElapsedEventHandler(graphUpdateTimer_Tick);
-            graphUpdateTimer.Start();
+            updateTimer = new System.Timers.Timer();
+            updateTimer.Enabled = true;
+            updateTimer.Interval = 1000;
+            updateTimer.Elapsed += new ElapsedEventHandler(updateTimer_Tick);
+            updateTimer.Start();
             errorGraph.Titles.Clear();
             errorGraph.ChartAreas.Clear();
             errorGraph.Series.Clear();
@@ -70,8 +70,7 @@ namespace Dabas.NeuralNetwork_UI
                 Name = "Error",
                 Color = Color.Plum,
                 BorderWidth = 1,
-                ChartType = SeriesChartType.Line,
-                IsVisibleInLegend = true
+                ChartType = SeriesChartType.Line
             };
 
             chartArea.CursorX.IsUserSelectionEnabled = true;
@@ -88,6 +87,8 @@ namespace Dabas.NeuralNetwork_UI
             chartArea.CursorX.IsUserSelectionEnabled = true;
             chartArea.BackColor = Color.Transparent;
 
+            series.IsVisibleInLegend = false;
+
             errorGraph.ChartAreas.Add(chartArea);
             errorGraph.Series.Add(series);
 
@@ -95,14 +96,13 @@ namespace Dabas.NeuralNetwork_UI
 
         private void InitializeComponent()
         {
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea2 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend2 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.errorGraph = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.downArrow = new System.Windows.Forms.PictureBox();
             this.upArrow = new System.Windows.Forms.PictureBox();
             this.outputBox = new System.Windows.Forms.RichTextBox();
-            this.label2 = new System.Windows.Forms.Label();
             this.trainingProgressBar = new System.Windows.Forms.ProgressBar();
             this.trainingLabel = new System.Windows.Forms.Label();
             this.trainingPer = new System.Windows.Forms.Label();
@@ -122,17 +122,17 @@ namespace Dabas.NeuralNetwork_UI
             this.errorGraph.BorderlineColor = System.Drawing.Color.DimGray;
             this.errorGraph.BorderlineDashStyle = System.Windows.Forms.DataVisualization.Charting.ChartDashStyle.Solid;
             this.errorGraph.BorderlineWidth = 2;
-            chartArea2.Name = "ChartArea1";
-            this.errorGraph.ChartAreas.Add(chartArea2);
-            legend2.Name = "Legend1";
-            this.errorGraph.Legends.Add(legend2);
-            this.errorGraph.Location = new System.Drawing.Point(17, 204);
+            chartArea1.Name = "ChartArea1";
+            this.errorGraph.ChartAreas.Add(chartArea1);
+            legend1.Name = "Legend1";
+            this.errorGraph.Legends.Add(legend1);
+            this.errorGraph.Location = new System.Drawing.Point(17, 242);
             this.errorGraph.Name = "errorGraph";
-            series2.ChartArea = "ChartArea1";
-            series2.Legend = "Legend1";
-            series2.Name = "Series1";
-            this.errorGraph.Series.Add(series2);
-            this.errorGraph.Size = new System.Drawing.Size(945, 445);
+            series1.ChartArea = "ChartArea1";
+            series1.Legend = "Legend1";
+            series1.Name = "Series1";
+            this.errorGraph.Series.Add(series1);
+            this.errorGraph.Size = new System.Drawing.Size(945, 465);
             this.errorGraph.TabIndex = 5;
             this.errorGraph.Text = "errorGraph";
             // 
@@ -143,7 +143,7 @@ namespace Dabas.NeuralNetwork_UI
             this.downArrow.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
             this.downArrow.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.downArrow.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.downArrow.Location = new System.Drawing.Point(26, 252);
+            this.downArrow.Location = new System.Drawing.Point(26, 295);
             this.downArrow.Name = "downArrow";
             this.downArrow.Size = new System.Drawing.Size(30, 30);
             this.downArrow.TabIndex = 7;
@@ -157,7 +157,7 @@ namespace Dabas.NeuralNetwork_UI
             this.upArrow.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Zoom;
             this.upArrow.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
             this.upArrow.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.upArrow.Location = new System.Drawing.Point(26, 216);
+            this.upArrow.Location = new System.Drawing.Point(26, 259);
             this.upArrow.Name = "upArrow";
             this.upArrow.Size = new System.Drawing.Size(30, 30);
             this.upArrow.TabIndex = 6;
@@ -170,33 +170,23 @@ namespace Dabas.NeuralNetwork_UI
             | System.Windows.Forms.AnchorStyles.Right)));
             this.outputBox.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(64)))));
             this.outputBox.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this.outputBox.Font = new System.Drawing.Font("Consolas", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.outputBox.Font = new System.Drawing.Font("Corbel", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.outputBox.ForeColor = System.Drawing.Color.White;
-            this.outputBox.Location = new System.Drawing.Point(12, 28);
+            this.outputBox.Location = new System.Drawing.Point(12, 12);
             this.outputBox.MinimumSize = new System.Drawing.Size(950, 140);
             this.outputBox.Name = "outputBox";
             this.outputBox.ReadOnly = true;
-            this.outputBox.Size = new System.Drawing.Size(950, 140);
+            this.outputBox.Size = new System.Drawing.Size(950, 204);
             this.outputBox.TabIndex = 8;
             this.outputBox.Text = "";
-            // 
-            // label2
-            // 
-            this.label2.AutoSize = true;
-            this.label2.ForeColor = System.Drawing.Color.Black;
-            this.label2.Location = new System.Drawing.Point(14, 7);
-            this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(71, 16);
-            this.label2.TabIndex = 10;
-            this.label2.Text = "OUTPUT";
             // 
             // trainingProgressBar
             // 
             this.trainingProgressBar.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.trainingProgressBar.Location = new System.Drawing.Point(115, 174);
+            this.trainingProgressBar.Location = new System.Drawing.Point(115, 223);
             this.trainingProgressBar.Name = "trainingProgressBar";
-            this.trainingProgressBar.Size = new System.Drawing.Size(847, 25);
+            this.trainingProgressBar.Size = new System.Drawing.Size(847, 12);
             this.trainingProgressBar.Step = 1;
             this.trainingProgressBar.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
             this.trainingProgressBar.TabIndex = 11;
@@ -206,7 +196,7 @@ namespace Dabas.NeuralNetwork_UI
             this.trainingLabel.AutoSize = true;
             this.trainingLabel.BackColor = System.Drawing.Color.Transparent;
             this.trainingLabel.ForeColor = System.Drawing.Color.Black;
-            this.trainingLabel.Location = new System.Drawing.Point(13, 176);
+            this.trainingLabel.Location = new System.Drawing.Point(17, 220);
             this.trainingLabel.Name = "trainingLabel";
             this.trainingLabel.Size = new System.Drawing.Size(80, 16);
             this.trainingLabel.TabIndex = 12;
@@ -220,7 +210,7 @@ namespace Dabas.NeuralNetwork_UI
             this.trainingPer.BackColor = System.Drawing.Color.Transparent;
             this.trainingPer.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.trainingPer.ForeColor = System.Drawing.Color.Black;
-            this.trainingPer.Location = new System.Drawing.Point(507, 179);
+            this.trainingPer.Location = new System.Drawing.Point(508, 219);
             this.trainingPer.Name = "trainingPer";
             this.trainingPer.Size = new System.Drawing.Size(27, 16);
             this.trainingPer.TabIndex = 13;
@@ -229,11 +219,10 @@ namespace Dabas.NeuralNetwork_UI
             // NNUIFORM
             // 
             this.BackColor = System.Drawing.Color.White;
-            this.ClientSize = new System.Drawing.Size(984, 661);
+            this.ClientSize = new System.Drawing.Size(984, 719);
             this.Controls.Add(this.trainingPer);
             this.Controls.Add(this.trainingLabel);
             this.Controls.Add(this.trainingProgressBar);
-            this.Controls.Add(this.label2);
             this.Controls.Add(this.outputBox);
             this.Controls.Add(this.downArrow);
             this.Controls.Add(this.upArrow);
@@ -255,7 +244,7 @@ namespace Dabas.NeuralNetwork_UI
         {
             if (errorGraph.InvokeRequired)
             {
-                errorGraph.Invoke(new UpdateCall(UpdateErrorGraph));
+                errorGraph.BeginInvoke(new UpdateCall(UpdateErrorGraph));
             }
             else
             {
@@ -274,23 +263,19 @@ namespace Dabas.NeuralNetwork_UI
             }
         }
 
-        private void graphUpdateTimer_Tick(object sender, EventArgs e)
+        private void updateTimer_Tick(object sender, EventArgs e)
         {
-            
-            if (graphUpdateOngoing == false)
-            {
-                graphUpdateOngoing = true;
-                UpdateErrorGraph();
-                graphUpdateOngoing = false;
-            }
+            graphUpdateSemaphore.WaitOne();
+            UpdateErrorGraph();
+            graphUpdateSemaphore.Release();
         }
 
         private void upArrow_Click(object sender, EventArgs e)
         {
             chartArea.AxisY.ScaleView.Zoomable = true;
             zoomScale *= 2;
-            double lowerLimit = chartArea.AxisY.Minimum;
-            double upperLimit = chartArea.AxisX.Maximum;
+            double lowerLimit = chartArea.AxisY.Minimum * zoomScale;
+            double upperLimit = chartArea.AxisX.Maximum * zoomScale;
             chartArea.AxisY.ScaleView.Zoom(lowerLimit * zoomScale, upperLimit * zoomScale);
         }
 
@@ -298,8 +283,8 @@ namespace Dabas.NeuralNetwork_UI
         {
             chartArea.AxisY.ScaleView.Zoomable = true;
             zoomScale /= 2;
-            double lowerLimit = chartArea.AxisY.Minimum;
-            double upperLimit = chartArea.AxisX.Maximum;
+            double lowerLimit = chartArea.AxisY.Minimum * zoomScale;
+            double upperLimit = chartArea.AxisY.Maximum * zoomScale;
             chartArea.AxisY.ScaleView.Zoom(lowerLimit * zoomScale, upperLimit * zoomScale);
         }
 
