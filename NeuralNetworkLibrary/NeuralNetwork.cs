@@ -15,6 +15,7 @@ namespace Dabas.NeuralNewtork
         public int trainingCounter = 0;
         Queue<double> prevErrors = new Queue<double>();
         double prevErrorSum = 0;
+        public int batchSize = 1, batchUsed = 0;
 
         List<Layer> layers;
         Dictionary<int, Neuron> neurons;
@@ -156,21 +157,30 @@ namespace Dabas.NeuralNewtork
             }
 
             // Update Connection Weights
-
+            batchUsed++;
             foreach (Connection connection in connections.Values)
             {
                 Neuron src = neurons[connection.src];
                 Neuron dest = neurons[connection.dest];
 
-                double weightDelta = -learningRate * dest.deltaBack * src.output;
+                double weightDelta = -dest.deltaBack * src.output;
+                connections[connection.connectionIdx].weightDelta += weightDelta;
+                neurons[connection.src].deltaBias += -dest.deltaBack;
+                if (batchUsed == batchSize)
+                {
+                    weightDelta = learningRate * connections[connection.connectionIdx].weightDelta / (double)batchSize;
+                    if (weightDelta * connection.previousWeightDelta < 0)
+                        connection.previousWeightDelta *= 0.5;
 
-                if (weightDelta * connection.previousWeightDelta < 0)
-                    connection.previousWeightDelta *= 0.5;
-
-                connections[connection.connectionIdx].weight += weightDelta + momentum * connection.previousWeightDelta;
-                connections[connection.connectionIdx].previousWeightDelta = connection.previousWeightDelta + weightDelta;
-                neurons[connection.src].bias += -learningRate * dest.deltaBack;
+                    connections[connection.connectionIdx].weight += weightDelta + momentum * connection.previousWeightDelta;
+                    connections[connection.connectionIdx].previousWeightDelta = connection.previousWeightDelta + weightDelta;
+                    neurons[connection.src].bias += learningRate * neurons[connection.src].deltaBias / (double)batchSize;
+                    connections[connection.connectionIdx].weightDelta = 0;
+                    neurons[connection.src].deltaBias = 0;
+                }
             }
+            if (batchUsed >= batchSize)
+                batchUsed = 0;
 
             //To Update UI
             ui.nnUIForm.graphUpdateSemaphore.WaitOne();
@@ -241,7 +251,7 @@ namespace Dabas.NeuralNewtork
 
             writer.WriteStartElement("Neurons");
             writer.WriteAttributeString("Count", neurons.Values.Count.ToString());
-            foreach(Neuron neuron in neurons.Values)
+            foreach (Neuron neuron in neurons.Values)
             {
                 writer.WriteStartElement("Neuron");
                 writer.WriteAttributeString("Bias", neuron.bias.ToString());
@@ -298,7 +308,7 @@ namespace Dabas.NeuralNewtork
             args.tFuncType = new TransferFuncType[layerCnt];
 
             basePath += "Layer[@Index='{0}']/@{1}";
-            for(int i = 0; i < layerCnt; i++)
+            for (int i = 0; i < layerCnt; i++)
             {
                 int.TryParse(XPathValue(string.Format(basePath, i.ToString(), "Neurons"), ref doc), out args.layersCnt[i]);
                 Enum.TryParse<TransferFuncType>(XPathValue(string.Format(basePath, i.ToString(), "Type"), ref doc), out args.tFuncType[i]);
@@ -311,7 +321,7 @@ namespace Dabas.NeuralNewtork
             basePath = "NeuralNetwork/Neurons/Neuron[@Index='{0}']/@Bias";
             int neuronCnt;
             int.TryParse(XPathValue("NeuralNetwork/Neurons/@Count", ref doc), out neuronCnt);
-            for(int i = 0; i < neuronCnt; i++)
+            for (int i = 0; i < neuronCnt; i++)
             {
                 double.TryParse(XPathValue(string.Format(basePath, i.ToString()), ref doc), out nn.neurons[i].bias);
             }
@@ -381,7 +391,7 @@ namespace Dabas.NeuralNewtork
 
     class Neuron
     {
-        public double input, output, deltaBack, bias;
+        public double input, output, deltaBack, bias, deltaBias;
         public int neuronIdx;
         public List<int> incommingConnection, outgoingConnection;
         TransferFuncType tFuncType;
@@ -394,6 +404,7 @@ namespace Dabas.NeuralNewtork
             input = 0;
             deltaBack = 0;
             output = 0;
+            deltaBias = 0;
             bias = Gaussian.GetRandomGaussian();
             this.tFuncType = tFuncType;
 

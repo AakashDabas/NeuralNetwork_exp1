@@ -124,15 +124,18 @@ namespace NeuralNetwork_Caller
             }
 
 
-            NeuralNetwork nn = NeuralNetwork.Load("Testing.xml", true);
-
+            //NeuralNetwork nn = NeuralNetwork.Load("Testing.xml", true);
+            NeuralNetwork nn = new NeuralNetwork(new int[] { 784, 10 },
+                                   new TransferFuncType[] { TransferFuncType.NONE,
+                                                TransferFuncType.SIGMOID}, 60000, 100);
+            nn.batchSize = 100;
             double error = 0;
 
             for (int i = nn.trainingCounter; i < limit; i++)
             {
                 error = 0;
-                double learningRate = 0.001;
-                double momentum = 0.1;
+                double learningRate = 0.05;
+                double momentum = 0.01;
                 bool displayOutput = false;
                 if (i % (limit > 10 ? limit / 1000 : 1) == 0)
                 {
