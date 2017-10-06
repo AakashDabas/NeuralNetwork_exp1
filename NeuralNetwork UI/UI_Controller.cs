@@ -12,7 +12,7 @@ namespace Dabas.NeuralNetwork_UI
         public NNUIFORM nnUIForm;
         delegate void InvokeHelperStr1(string text);
         delegate void InvokeHelperInt2(int a, int b);
-        static Semaphore semaphore = new Semaphore(3, 3);
+        static Semaphore semaphore = new Semaphore(1, 1);
 
         public NeuralNetworkUI()
         {
@@ -33,11 +33,11 @@ namespace Dabas.NeuralNetwork_UI
 
         public void RegisterOutput(string text)
         {
-            semaphore.WaitOne();
             if (nnUIForm.outputBox.InvokeRequired)
             {
-
+                semaphore.WaitOne();
                 nnUIForm.outputBox.BeginInvoke((MethodInvoker)(() => RegisterOutput(text)));
+                semaphore.Release();
             }
             else
             {
@@ -48,7 +48,6 @@ namespace Dabas.NeuralNetwork_UI
                 }
 
             }
-            semaphore.Release();
         }
 
         public void SetProgressBar(int cntTrainingDone, int cntTotalTraining)

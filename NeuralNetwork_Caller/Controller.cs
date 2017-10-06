@@ -124,18 +124,17 @@ namespace NeuralNetwork_Caller
             }
 
 
-            //NeuralNetwork nn = NeuralNetwork.Load("Testing.xml", true);
-            NeuralNetwork nn = new NeuralNetwork(new int[] { 784, 10 },
-                                   new TransferFuncType[] { TransferFuncType.NONE,
-                                                TransferFuncType.SIGMOID}, 60000, 100);
-            nn.batchSize = 100;
+            NeuralNetwork nn = NeuralNetwork.Load("Temp2.xml", true);
+            //NeuralNetwork nn = new NeuralNetwork(new int[] { 784, 20, 10 },
+            //                       new TransferFuncType[] { TransferFuncType.NONE, TransferFuncType.SIGMOID, TransferFuncType.SOFTMAX }, 60000, 100);
+            nn.batchSize = 1;
             double error = 0;
-
+            int cnt = 0;
             for (int i = nn.trainingCounter; i < limit; i++)
             {
                 error = 0;
-                double learningRate = 0.05;
-                double momentum = 0.01;
+                double learningRate = 0.2;
+                double momentum = 0.05;
                 bool displayOutput = false;
                 if (i % (limit > 10 ? limit / 1000 : 1) == 0)
                 {
@@ -145,9 +144,9 @@ namespace NeuralNetwork_Caller
 
                 double[] input = new double[height * width];
 
-                for(int j= 0; j < height; j++)
-                    for(int k = 0; k < width; k++)
-                        input[j * width + k] = data[i][j, k] / 255.0;
+                for (int j = 0; j < height; j++)
+                    for (int k = 0; k < width; k++)
+                        input[j * width + k] = (data[i][j, k] >= 140 ? 1 : 0);
 
                 double[] output = new double[10];
                 for (int j = 0; j < 10; j++)
@@ -158,14 +157,21 @@ namespace NeuralNetwork_Caller
                     nn.RegisterOutput(string.Format("Label: {0}", label[i]));
 
                 error = nn.Train(input, output, learningRate, momentum, displayOutput);
-
+                if (error == double.NaN)
+                    break;
+                if (error < 0.00001)
+                    cnt++;
+                else
+                    cnt = 0;
+                if (cnt == 100)
+                    break;
                 if (displayOutput)
                     nn.RegisterOutput(string.Format("Error : {0}", error));
 
                 if (i % 1000 == 0 && i != 0)
                     nn.Save("Testing.xml", "Testin01");
             }
-            nn.Save("Testing.xml", "DigitRecognizer");
+             nn.Save("Testing.xml", "DigitRecognizer");
             return error;
         }
     }

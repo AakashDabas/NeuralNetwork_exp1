@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Dabas.NeuralNetwork_UI;
 using System.IO;
 using System.Xml;
+using System.Diagnostics;
 
 namespace Dabas.NeuralNewtork
 {
@@ -16,6 +17,7 @@ namespace Dabas.NeuralNewtork
         Queue<double> prevErrors = new Queue<double>();
         double prevErrorSum = 0;
         public int batchSize = 1, batchUsed = 0;
+        public bool ShowUi = true;
 
         List<Layer> layers;
         Dictionary<int, Neuron> neurons;
@@ -26,6 +28,9 @@ namespace Dabas.NeuralNewtork
         NeuralNetworkUI ui;
         // To store graph data
         Queue<double> xAxisData, yAxisData;
+
+        // Testing Vars
+        Queue<bool> results = new Queue<bool>();
 
         NeuralNetworkArgs args;
 
@@ -72,7 +77,7 @@ namespace Dabas.NeuralNewtork
             RegisterOutput("Neural Network Initialized");
         }
 
-        public void Run(double[] input, bool displayOutput)
+        public void Run(double[] input, out double[] output, bool displayOutput)
         {
             // Check for valid input
             if (input.Length != layers[0].cntNeurons)
@@ -86,7 +91,7 @@ namespace Dabas.NeuralNewtork
                 neurons[idx].input = input[idx];
                 buffer.Enqueue(idx);
             }
-
+            double softMaxDenominator = 0;
             // Perform BFS
             while (buffer.Count != 0)
             {
@@ -95,6 +100,8 @@ namespace Dabas.NeuralNewtork
                 // Evaluate current neuron's output
                 // Use this output to add weighted output to all connected neurons
                 neurons[idx].Evaluate();
+                if (neurons[idx].tFuncType == TransferFuncType.SOFTMAX)
+                    softMaxDenominator += neurons[idx].output;
                 foreach (int cIdx in neurons[idx].outgoingConnection)
                 {
                     Connection connection = connections[cIdx];
@@ -102,6 +109,23 @@ namespace Dabas.NeuralNewtork
                     if (buffer.Contains(connection.dest) == false)
                         buffer.Enqueue(connection.dest);
                 }
+            }
+
+            if (layers.Last().tFuncType == TransferFuncType.SOFTMAX)
+                foreach (int idx in layers.Last().neuronIdxs)
+                {
+                    neurons[idx].output /= softMaxDenominator;
+                    if (double.IsNaN(neurons[idx].output))
+                    {
+                        output = null;
+                        return;
+                    }
+                }
+
+            output = new double[layers.Last().neuronIdxs.Count()];
+            for (int i = 0; i < layers.Last().neuronIdxs.Count(); i++)
+            {
+                output[i] = neurons[layers.Last().neuronIdxs[i]].output;
             }
 
             // Output Layer
@@ -121,7 +145,13 @@ namespace Dabas.NeuralNewtork
                 throw new Exception("Input and layer size mismatch! Invalid input given to NeuralNetwork.Train()");
 
             // Forward pass
-            Run(input, displayOutput);
+            double[] nnOutput = new double[output.Count()];
+            Run(input, out nnOutput, displayOutput);
+            if (nnOutput == null)
+            {
+                Console.Write("Bug!");
+                return 0;
+            }
 
             // Compute error
 
@@ -179,6 +209,7 @@ namespace Dabas.NeuralNewtork
                     neurons[connection.src].deltaBias = 0;
                 }
             }
+
             if (batchUsed >= batchSize)
                 batchUsed = 0;
 
@@ -193,7 +224,29 @@ namespace Dabas.NeuralNewtork
                 prevErrors.Enqueue(totalError);
                 prevErrorSum += totalError;
                 xAxisData.Enqueue(trainingCounter);
-                yAxisData.Enqueue(prevErrorSum / prevErrors.Count);
+
+                double maxValue = output.Max();
+                int maxIndex1 = output.ToList().IndexOf(maxValue);
+
+                maxValue = nnOutput.Max();
+                int maxIndex2 = nnOutput.ToList().IndexOf(maxValue);
+
+                if (maxIndex1 == maxIndex2)
+                    results.Enqueue(true);
+                else
+                    results.Enqueue(false);
+                if (results.Count == 1000)
+                    results.Dequeue();
+                double correct = 0, wrong = 0;
+                foreach (bool res in results)
+                {
+                    if (res)
+                        correct++;
+                    else
+                        wrong++;
+                }
+                yAxisData.Enqueue(wrong / (correct + wrong));
+                //yAxisData.Enqueue(prevErrorSum / prevErrors.Count);
             }
             ui.nnUIForm.graphUpdateSemaphore.Release();
             return totalError;
@@ -207,7 +260,10 @@ namespace Dabas.NeuralNewtork
 
         public void RegisterOutput(string text)
         {
-            ui.RegisterOutput(text);
+            if (ShowUi && UIThread.IsAlive)
+                ui.RegisterOutput(text);
+            else
+                Console.WriteLine(text);
         }
 
         public void Save(string filePath, string networkName)
@@ -327,16 +383,22 @@ namespace Dabas.NeuralNewtork
             }
             nn.RegisterOutput("Loading Connections");
             basePath = "NeuralNetwork/Connections/Connection[@Index='{0}']/@{1}";
-            int connectionCnt;
+
+            int itr = 0, connectionCnt;
+            double lastLoadMsg = 0;
             int.TryParse(XPathValue("NeuralNetwork/Connections/@Count", ref doc), out connectionCnt);
-            for (int i = 0; i < connectionCnt; i++)
+            XmlNodeList connectionList = doc.SelectNodes("NeuralNetwork/Connections/Connection");
+            foreach (XmlNode connection in connectionList)
             {
-                double.TryParse(XPathValue(string.Format(basePath, i.ToString(), "Weight"), ref doc), out nn.connections[i].weight);
-                double.TryParse(XPathValue(string.Format(basePath, i.ToString(), "PreviousWeightDelta"), ref doc), out nn.connections[i].previousWeightDelta);
-                double completed = (i + 1) * 100.0 / connectionCnt;
-                if (completed == 25 || completed == 50 || completed == 75 || completed == 100)
+                double.TryParse(connection.Attributes["Weight"].Value, out nn.connections[itr].weight);
+                double.TryParse(connection.Attributes["PreviousWeightDelta"].Value, out nn.connections[itr].previousWeightDelta);
+                itr++;
+                double completed = (itr + 1) * 100.0 / connectionCnt;
+                if (completed - lastLoadMsg >= 5)
                 {
+                    lastLoadMsg = completed;
                     nn.RegisterOutput("Connections Loaded : " + completed + "%");
+                    Console.WriteLine("Connections Loaded : " + completed + "%");
                 }
             }
             nn.RegisterOutput("Neural Network : " + XPathValue("NeuralNetwork/@Name", ref doc) + "Loaded Successfully : )");
@@ -370,7 +432,7 @@ namespace Dabas.NeuralNewtork
     {
         public int cntNeurons;
         public int[] neuronIdxs;
-        TransferFuncType tFuncType;
+        public TransferFuncType tFuncType;
 
         public Layer(int cntNeurons, TransferFuncType tFuncType, Layer previousLayer,
             ref Dictionary<int, Neuron> neurons, ref int neuronCounter,
@@ -394,7 +456,7 @@ namespace Dabas.NeuralNewtork
         public double input, output, deltaBack, bias, deltaBias;
         public int neuronIdx;
         public List<int> incommingConnection, outgoingConnection;
-        TransferFuncType tFuncType;
+        public TransferFuncType tFuncType;
 
         public Neuron(TransferFuncType tFuncType, Layer previousLayer,
             ref Dictionary<int, Neuron> neurons, ref int neuronCounter,
@@ -437,7 +499,7 @@ namespace Dabas.NeuralNewtork
 
         public double EvaluateDerivative()
         {
-            if (tFuncType == TransferFuncType.SIGMOID)
+            if (tFuncType == TransferFuncType.SIGMOID || tFuncType == TransferFuncType.SOFTMAX)
                 return output * (1 - output);
             return TransferFunction.EvaluateDerivate(tFuncType, input);
         }
@@ -506,9 +568,11 @@ namespace Dabas.NeuralNewtork
                 case TransferFuncType.RECTILINEAR:
                     output = RectiLinear(x);
                     break;
+                case TransferFuncType.SOFTMAX:
+                    output = Math.Exp(x);
+                    break;
                 default:
                     throw new FormatException("Invalid Input Provided To TransferFunction.Evaluate()");
-                    break;
             }
 
             return output;
@@ -546,7 +610,6 @@ namespace Dabas.NeuralNewtork
                     break;
                 default:
                     throw new FormatException("Invalid Input Provided To TransferFunction.EvaluateDerivative()");
-                    break;
             }
 
             return output;
