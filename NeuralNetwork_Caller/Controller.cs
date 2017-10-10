@@ -97,7 +97,6 @@ namespace NeuralNetwork_Caller
 
         static double test3()
         {
-            //
             int limit = 0;
             int height, width;
             Dictionary<int, byte[,]> data = new Dictionary<int, byte[,]>();
@@ -124,7 +123,7 @@ namespace NeuralNetwork_Caller
             }
 
 
-            NeuralNetwork nn = NeuralNetwork.Load("Temp2.xml", true);
+            NeuralNetwork nn = NeuralNetwork.Load("Testing5.xml", true);
             //NeuralNetwork nn = new NeuralNetwork(new int[] { 784, 20, 10 },
             //                       new TransferFuncType[] { TransferFuncType.NONE, TransferFuncType.SIGMOID, TransferFuncType.SOFTMAX }, 60000, 100);
             nn.batchSize = 1;

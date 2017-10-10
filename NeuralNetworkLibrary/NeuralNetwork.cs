@@ -41,7 +41,7 @@ namespace Dabas.NeuralNewtork
             public int intendedTrainingCnt = 0;
         }
 
-        public NeuralNetwork(int[] layersCnt, TransferFuncType[] tFuncType, int intendedTrainingCnt = 1, double weightRescaleFactor = 1, bool showNNUI = true)
+        public void INIT(int[] layersCnt, TransferFuncType[] tFuncType, int intendedTrainingCnt, bool showNNUI)
         {
             args = new NeuralNetworkArgs();
             args.layersCnt = layersCnt;
@@ -55,6 +55,16 @@ namespace Dabas.NeuralNewtork
             UIThread = new Thread(ui.StartUI);
             if (showNNUI)
                 UIThread.Start();
+        }
+
+        public NeuralNetwork(int[] layersCnt, TransferFuncType[] tFuncType, int intendedTrainingCnt, bool showNNUI)
+        {
+            INIT(layersCnt, tFuncType, intendedTrainingCnt, showNNUI);
+        }
+
+        public NeuralNetwork(int[] layersCnt, TransferFuncType[] tFuncType, int intendedTrainingCnt = 1, double weightRescaleFactor = 1, bool showNNUI = true)
+        {
+            INIT(layersCnt, tFuncType, intendedTrainingCnt, showNNUI);
             if (layersCnt.Length != tFuncType.Length)
                 throw new Exception("Input size mismatch! Invalid input to NeuralNetwork Constructor");
 
@@ -77,13 +87,27 @@ namespace Dabas.NeuralNewtork
             RegisterOutput("Neural Network Initialized");
         }
 
+        private void Reset()
+        {
+            Neuron.Reset(ref neurons);
+
+            // Reset weights for MAXPOOL layer
+            foreach (Neuron neuron in neurons.Values)
+                if (neuron.tFuncType == TransferFuncType.MAXPOOL)
+                {
+                    foreach (int cIdx in neuron.incommingConnection)
+                    {
+                        connections[cIdx].weight = 1;
+                    }
+                }
+        }
+
         public void Run(double[] input, out double[] output, bool displayOutput)
         {
             // Check for valid input
             if (input.Length != layers[0].cntNeurons)
                 throw new Exception("Input layer size mismatch! Invalid input given to NeuralNetwork.Run()");
-
-            Neuron.Reset(ref neurons);
+            Reset();
             // Initialize input neurons
             Queue<int> buffer = new Queue<int>();
             foreach (int idx in layers[0].neuronIdxs)
@@ -99,15 +123,16 @@ namespace Dabas.NeuralNewtork
 
                 // Evaluate current neuron's output
                 // Use this output to add weighted output to all connected neurons
-                neurons[idx].Evaluate();
+                neurons[idx].Evaluate(ref neurons, ref connections);
                 if (neurons[idx].tFuncType == TransferFuncType.SOFTMAX)
                     softMaxDenominator += neurons[idx].output;
                 foreach (int cIdx in neurons[idx].outgoingConnection)
                 {
                     Connection connection = connections[cIdx];
-                    neurons[connection.dest].input += neurons[idx].output * connection.weight;
-                    if (buffer.Contains(connection.dest) == false)
-                        buffer.Enqueue(connection.dest);
+                    int dest = connection.srcDest[idx];
+                    neurons[dest].input += neurons[idx].output * connection.weight;
+                    if (buffer.Contains(dest) == false)
+                        buffer.Enqueue(dest);
                 }
             }
 
@@ -163,8 +188,8 @@ namespace Dabas.NeuralNewtork
                 Neuron neuron = neurons[layers.Last().neuronIdxs[itr]];
                 double error = neuron.output - output[itr];
                 totalError += error * error / 2.0;
-                neurons[neuron.neuronIdx].deltaBack = error;
-                buffer.Enqueue(neuron.neuronIdx);
+                neurons[neuron.Idx].deltaBack = error;
+                buffer.Enqueue(neuron.Idx);
             }
 
             // BackPropagate Error/Deltas
@@ -179,7 +204,7 @@ namespace Dabas.NeuralNewtork
                 {
                     Connection connection = connections[idx];
                     double deltaBackward = connection.weight * neuron.deltaBack;
-                    int src = connection.src;
+                    int src = connection.srcDest.FirstOrDefault(x => x.Value == neuron.Idx).Key;
                     neurons[src].deltaBack += deltaBackward;
                     if (buffer.Contains(src) == false)
                         buffer.Enqueue(src);
@@ -190,23 +215,33 @@ namespace Dabas.NeuralNewtork
             batchUsed++;
             foreach (Connection connection in connections.Values)
             {
-                Neuron src = neurons[connection.src];
-                Neuron dest = neurons[connection.dest];
+                if (connection.updateAllowed == false)
+                    continue;
+                foreach (int srcIdx in connection.srcDest.Keys)
+                {
+                    Neuron src = neurons[srcIdx];
+                    Neuron dest = neurons[connection.srcDest[srcIdx]];
 
-                double weightDelta = -dest.deltaBack * src.output;
-                connections[connection.connectionIdx].weightDelta += weightDelta;
-                neurons[connection.src].deltaBias += -dest.deltaBack;
+                    double weightDelta = -dest.deltaBack * src.output;
+                    connections[connection.Idx].weightDelta += weightDelta;
+                    neurons[srcIdx].deltaBias += -dest.deltaBack;
+                }
                 if (batchUsed == batchSize)
                 {
-                    weightDelta = learningRate * connections[connection.connectionIdx].weightDelta / (double)batchSize;
+                    double weightDelta = learningRate * connections[connection.Idx].weightDelta / (double)batchSize;
                     if (weightDelta * connection.previousWeightDelta < 0)
                         connection.previousWeightDelta *= 0.5;
-
-                    connections[connection.connectionIdx].weight += weightDelta + momentum * connection.previousWeightDelta;
-                    connections[connection.connectionIdx].previousWeightDelta = connection.previousWeightDelta + weightDelta;
-                    neurons[connection.src].bias += learningRate * neurons[connection.src].deltaBias / (double)batchSize;
-                    connections[connection.connectionIdx].weightDelta = 0;
-                    neurons[connection.src].deltaBias = 0;
+                    connections[connection.Idx].weight += weightDelta + momentum * connection.previousWeightDelta;
+                    connections[connection.Idx].previousWeightDelta = connection.previousWeightDelta + weightDelta;
+                    connections[connection.Idx].weightDelta = 0;
+                }
+            }
+            if (batchUsed == batchSize)
+            {
+                foreach (Neuron neuron in neurons.Values)
+                {
+                    neuron.bias += learningRate * neuron.deltaBias / (double)batchSize;
+                    neuron.deltaBias = 0;
                 }
             }
 
@@ -311,7 +346,7 @@ namespace Dabas.NeuralNewtork
             {
                 writer.WriteStartElement("Neuron");
                 writer.WriteAttributeString("Bias", neuron.bias.ToString());
-                writer.WriteAttributeString("Index", neuron.neuronIdx.ToString());
+                writer.WriteAttributeString("Index", neuron.Idx.ToString());
                 writer.WriteEndElement();
             }
             writer.WriteEndElement(); // Neurons
@@ -320,13 +355,16 @@ namespace Dabas.NeuralNewtork
             writer.WriteAttributeString("Count", connections.Values.Count.ToString());
             foreach (Connection connection in connections.Values)
             {
-                writer.WriteStartElement("Connection");
-                writer.WriteAttributeString("PreviousWeightDelta", connection.previousWeightDelta.ToString());
-                writer.WriteAttributeString("Destination", connection.dest.ToString());
-                writer.WriteAttributeString("Source", connection.src.ToString());
-                writer.WriteAttributeString("Weight", connection.weight.ToString());
-                writer.WriteAttributeString("Index", connection.connectionIdx.ToString());
-                writer.WriteEndElement();
+                foreach (int src in connection.srcDest.Keys)
+                {
+                    writer.WriteStartElement("Connection");
+                    writer.WriteAttributeString("PreviousWeightDelta", connection.previousWeightDelta.ToString());
+                    writer.WriteAttributeString("Destination", connection.srcDest[src].ToString());
+                    writer.WriteAttributeString("Source", src.ToString());
+                    writer.WriteAttributeString("Weight", connection.weight.ToString());
+                    writer.WriteAttributeString("Index", connection.Idx.ToString());
+                    writer.WriteEndElement();
+                }
             }
             writer.WriteEndElement(); // Connections
 
@@ -384,22 +422,17 @@ namespace Dabas.NeuralNewtork
             nn.RegisterOutput("Loading Connections");
             basePath = "NeuralNetwork/Connections/Connection[@Index='{0}']/@{1}";
 
-            int itr = 0, connectionCnt;
             double lastLoadMsg = 0;
-            int.TryParse(XPathValue("NeuralNetwork/Connections/@Count", ref doc), out connectionCnt);
             XmlNodeList connectionList = doc.SelectNodes("NeuralNetwork/Connections/Connection");
             foreach (XmlNode connection in connectionList)
             {
-                double.TryParse(connection.Attributes["Weight"].Value, out nn.connections[itr].weight);
-                double.TryParse(connection.Attributes["PreviousWeightDelta"].Value, out nn.connections[itr].previousWeightDelta);
-                itr++;
-                double completed = (itr + 1) * 100.0 / connectionCnt;
-                if (completed - lastLoadMsg >= 5)
-                {
-                    lastLoadMsg = completed;
-                    nn.RegisterOutput("Connections Loaded : " + completed + "%");
-                    Console.WriteLine("Connections Loaded : " + completed + "%");
-                }
+                int idx, src, dest;
+                int.TryParse(connection.Attributes["Index"].Value, out idx);
+                int.TryParse(connection.Attributes["Source"].Value, out src);
+                int.TryParse(connection.Attributes["Destination"].Value, out dest);
+                double.TryParse(connection.Attributes["Weight"].Value, out nn.connections[idx].weight);
+                double.TryParse(connection.Attributes["PreviousWeightDelta"].Value, out nn.connections[idx].previousWeightDelta);
+                nn.connections[idx].srcDest[src] = dest;
             }
             nn.RegisterOutput("Neural Network : " + XPathValue("NeuralNetwork/@Name", ref doc) + "Loaded Successfully : )");
             doc = null;
@@ -425,43 +458,199 @@ namespace Dabas.NeuralNewtork
         TANH,
         LINEAR,
         RECTILINEAR,
-        SOFTMAX
+        SOFTMAX,
+        MAXPOOL
+    }
+
+    public class LayerData
+    {
+        public class FullyConnected
+        {
+            public int cntNeurons;
+            public TransferFuncType tFuncType;
+        }
+
+        public class Convolutional
+        {
+            public int[] filters;
+            public int stride;
+        }
+
+        public class RELU
+        {
+
+        }
+
+        public class MaxPool
+        {
+            public int size;
+            public int stride;
+        }
     }
 
     class Layer
     {
         public int cntNeurons;
-        public int[] neuronIdxs;
+        public List<int> neuronIdxs;
         public TransferFuncType tFuncType;
 
-        public Layer(int cntNeurons, TransferFuncType tFuncType, Layer previousLayer,
+        public Layer(Layer previousLayer, Object layerData,
             ref Dictionary<int, Neuron> neurons, ref int neuronCounter,
             ref Dictionary<int, Connection> connections, ref int connectionCounter,
             double weightRescaleFactor = 1)
         {
-            this.cntNeurons = cntNeurons;
-            this.tFuncType = tFuncType;
-            this.neuronIdxs = new int[cntNeurons];
+            Type layerDataType = layerData.GetType();
 
-            for (int i = 0; i < cntNeurons; i++)
+            // Form connections based upon layer type
+            if (layerDataType == typeof(LayerData.RELU))
             {
-                Neuron neuron = new Neuron(tFuncType, previousLayer, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, weightRescaleFactor);
-                neuronIdxs[i] = neuron.neuronIdx;
+                // One-To-One Connections
+                neuronIdxs = new List<int>();
+                tFuncType = TransferFuncType.RECTILINEAR;
+                foreach (int prevNeuronIdx in previousLayer.neuronIdxs)
+                {
+                    Neuron neuron = new Neuron(tFuncType);
+                    Connection connection = new Connection(ref connections, ref connectionCounter, weightRescaleFactor, false);
+                    connection.srcDest[prevNeuronIdx] = neuron.Idx;
+                    neuron.incommingConnection.Add(connection.Idx);
+                    neurons[prevNeuronIdx].outgoingConnection.Add(connection.Idx);
+                    neurons[neuronCounter++] = neuron;
+                    neuronIdxs.Add(neuron.Idx);
+                }
             }
+            else if (layerDataType == typeof(LayerData.FullyConnected))
+            {
+                // Cross Connections
+                LayerData.FullyConnected currLayerData = (LayerData.FullyConnected)layerData;
+                tFuncType = currLayerData.tFuncType;
+                neuronIdxs = new List<int>();
+                for (int i = 0; i < cntNeurons; i++)
+                {
+                    Neuron neuron = new Neuron(tFuncType, previousLayer, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, weightRescaleFactor);
+                    neuronIdxs.Add(neuron.Idx);
+                }
+            }
+            else if (layerDataType == typeof(LayerData.Convolutional))
+            {
+                LayerData.Convolutional currLayerData = (LayerData.Convolutional)layerData;
+                tFuncType = TransferFuncType.LINEAR;
+                neuronIdxs = new List<int>();
+                int dimIn = (int)Math.Sqrt(previousLayer.cntNeurons);
+                // Form connections for each filter
+                foreach (int filter in currLayerData.filters)
+                {
+                    Dictionary<int, int> filterConnections = new Dictionary<int, int>();
+                    for (int k1 = -filter / 2; k1 <= filter / 2; k1++)
+                        for (int k2 = -filter / 2; k2 <= filter / 2; k2++)
+                        {
+                            Connection connection = new Connection(ref connections, ref connectionCounter, weightRescaleFactor);
+                            int hashIdx = (k1 + filter / 2) * filter + (k2 + filter / 2);
+                            filterConnections[hashIdx] = connection.Idx;
+                        }
+                    // Zero padding is introduced for area which is not completly overlapped by filter
+                    for (int i = 0; i < dimIn; i += currLayerData.stride)
+                        for (int j = 0; j < dimIn; j += currLayerData.stride)
+                        {
+                            Neuron neuron = new Neuron(tFuncType);
+                            neurons[neuronCounter++] = neuron;
+                            neuronIdxs.Add(neuron.Idx);
+                            for (int k1 = -filter / 2; k1 <= filter / 2; k1++)
+                                for (int k2 = -filter / 2; k2 <= filter / 2; k2++)
+                                {
+                                    int idx = GetIndex(i + k1, j + k2, dimIn, previousLayer);
+                                    if (idx == -1)
+                                        continue;
+                                    int hashIdx = (k1 + filter / 2) * filter + (k2 + filter / 2);
+                                    int cIdx = filterConnections[hashIdx];
+                                    connections[cIdx].srcDest[idx] = neuron.Idx;
+                                }
+                        }
+                }
+            }
+            else if (layerDataType == typeof(LayerData.MaxPool))
+            {
+                LayerData.MaxPool currLayerData = (LayerData.MaxPool)layerData;
+                this.tFuncType = TransferFuncType.MAXPOOL;
+                neuronIdxs = new List<int>();
+                int dimIn = (int)Math.Sqrt(previousLayer.cntNeurons);
+                // Form connections for each filter
+                Dictionary<int, int> filterConnections = new Dictionary<int, int>();
+                for (int k1 = 0; k1 < currLayerData.size; k1++)
+                    for (int k2 = 0; k2 < currLayerData.size; k2++)
+                    {
+                        Connection connection = new Connection(ref connections, ref connectionCounter, weightRescaleFactor);
+                        int hashIdx = k1 * currLayerData.size + k2;
+                        filterConnections[hashIdx] = connection.Idx;
+                    }
+                // Zero padding is introduced for area which is not completly overlapped by filter
+                for (int i = 0; i < dimIn; i += currLayerData.stride)
+                    for (int j = 0; j < dimIn; j += currLayerData.stride)
+                    {
+                        Neuron neuron = new Neuron(tFuncType);
+                        neurons[neuronCounter++] = neuron;
+                        neuronIdxs.Add(neuron.Idx);
+                        for (int k1 = 0; k1 < currLayerData.size; k1++)
+                            for (int k2 = 0; k2 < currLayerData.size; k2++)
+                            {
+                                int idx = GetIndex(i + k1, j + k2, dimIn, previousLayer);
+                                if (idx == -1)
+                                    continue;
+                                int hashIdx = k1 * currLayerData.size + k2;
+                                int cIdx = filterConnections[hashIdx];
+                                connections[cIdx].srcDest[idx] = neuron.Idx;
+                            }
+                    }
+            }
+            else
+                throw new Exception("Invalid LayerConnectionStyle given to Layer.FormConnections  !!!!");
+            cntNeurons = neuronIdxs.Count();
+        }
+
+        public static void ConstructLayers(Object[] layersData, ref List<Layer> layers)
+        {
+            foreach(Object layerData in layersData)
+            {
+                Type layerType = layersData.GetType();
+                if(layerType == typeof(LayerData.FullyConnected))
+                {
+
+                }
+                else if(layerType == typeof(LayerData.RELU))
+                {
+
+                }
+                else if(layerType == typeof(LayerData.Convolutional))
+                {
+
+                }
+                else if(layerType == typeof(LayerData.MaxPool))
+                {
+
+                }
+                else
+                {
+                    throw new Exception("Invalid input given to Layer.ConstructLayers!!!!");
+                }
+            }
+        }
+
+        private int GetIndex(int i, int j, int dim, Layer layer)
+        {
+            if (i < 0 || i >= dim || j < 0 || j >= dim)
+                return -1;
+            else
+                return layer.neuronIdxs[i * dim + j];
         }
     }
 
     class Neuron
     {
         public double input, output, deltaBack, bias, deltaBias;
-        public int neuronIdx;
+        public int Idx;
         public List<int> incommingConnection, outgoingConnection;
         public TransferFuncType tFuncType;
 
-        public Neuron(TransferFuncType tFuncType, Layer previousLayer,
-            ref Dictionary<int, Neuron> neurons, ref int neuronCounter,
-            ref Dictionary<int, Connection> connections, ref int connectionCounter,
-            double weightRescaleFactor = 1)
+        private void INIT(TransferFuncType tFuncType)
         {
             input = 0;
             deltaBack = 0;
@@ -472,25 +661,56 @@ namespace Dabas.NeuralNewtork
 
             incommingConnection = new List<int>();
             outgoingConnection = new List<int>();
+        }
+
+        public Neuron(TransferFuncType tFuncType)
+        {
+            INIT(tFuncType);
+        }
+
+        public Neuron(TransferFuncType tFuncType, Layer previousLayer,
+            ref Dictionary<int, Neuron> neurons, ref int neuronCounter,
+            ref Dictionary<int, Connection> connections, ref int connectionCounter,
+            double weightRescaleFactor = 1)
+        {
+            INIT(tFuncType);
 
             if (previousLayer != null)
             {
                 foreach (int neuronIdx in previousLayer.neuronIdxs)
                 {
-                    Connection connection = new Connection(ref neurons, ref neuronCounter, ref connections, ref connectionCounter, weightRescaleFactor);
-                    connection.dest = neuronCounter;
-                    connection.src = neuronIdx;
-                    this.incommingConnection.Add(connection.connectionIdx);
-                    neurons[neuronIdx].outgoingConnection.Add(connection.connectionIdx);
+                    Connection connection = new Connection(ref connections, ref connectionCounter, weightRescaleFactor);
+                    connection.srcDest[neuronIdx] = neuronCounter;
+                    this.incommingConnection.Add(connection.Idx);
+                    neurons[neuronIdx].outgoingConnection.Add(connection.Idx);
                 }
             }
 
-            neuronIdx = neuronCounter;
+            Idx = neuronCounter;
             neurons[neuronCounter++] = this;
         }
 
-        public double Evaluate()
+        public double Evaluate(ref Dictionary<int, Neuron> neurons, ref Dictionary<int, Connection> connections)
         {
+            if (tFuncType == TransferFuncType.MAXPOOL)
+            {
+                int cFinalIdx = -1;
+                double finalOut = int.MinValue;
+                foreach (int cIdx in incommingConnection)
+                {
+                    connections[cIdx].weight = 0;
+                    foreach (int key in connections[cIdx].srcDest.Keys)
+                    {
+                        int srcIdx = key;
+                        if (neurons[srcIdx].output > finalOut)
+                        {
+                            finalOut = neurons[srcIdx].output;
+                            cFinalIdx = cIdx;
+                        }
+                    }
+                }
+                connections[cFinalIdx].weight = 1;
+            }
             if (tFuncType != TransferFuncType.NONE)
                 input += bias;
             output = TransferFunction.Evaluate(tFuncType, input);
@@ -499,6 +719,8 @@ namespace Dabas.NeuralNewtork
 
         public double EvaluateDerivative()
         {
+            if (tFuncType == TransferFuncType.MAXPOOL)
+                return 1;
             if (tFuncType == TransferFuncType.SIGMOID || tFuncType == TransferFuncType.SOFTMAX)
                 return output * (1 - output);
             return TransferFunction.EvaluateDerivate(tFuncType, input);
@@ -511,27 +733,29 @@ namespace Dabas.NeuralNewtork
                 neuron.input = 0;
                 neuron.deltaBack = 0;
                 neuron.output = 0;
+
             }
         }
     }
 
     class Connection
     {
-        public int src, dest;
+        public Dictionary<int, int> srcDest;
+        public int Idx;
         public double weight;
         public double weightDelta;
         public double previousWeightDelta;
-        public int connectionIdx;
+        public bool updateAllowed;
 
-        public Connection(ref Dictionary<int, Neuron> neurons, ref int neuronCounter,
-            ref Dictionary<int, Connection> connections, ref int connectionCounter,
-            double weightRescaleFactor = 1)
+        public Connection(ref Dictionary<int, Connection> connections, ref int connectionCounter,
+                          double weightRescaleFactor = 1, bool updateAllowed = true)
         {
+            this.updateAllowed = updateAllowed;
             weight = Gaussian.GetRandomGaussian() / weightRescaleFactor;
             weightDelta = 0;
             previousWeightDelta = 0;
-            dest = -1;
-            connectionIdx = connectionCounter;
+            srcDest = new Dictionary<int, int>();
+            Idx = connectionCounter;
             connections[connectionCounter++] = this;
         }
     }
