@@ -492,6 +492,7 @@ namespace Dabas.NeuralNetwork
                     Neuron neuron = new Neuron(tFuncType);
                     Connection connection = new Connection(ref connections, ref connectionCounter, weightRescaleFactor, false);
                     connection.weight = 1;
+                    neuron.Idx = neuronCounter;
                     connection.srcDest[prevNeuronIdx] = neuron.Idx;
                     neuron.incommingConnection.Add(connection.Idx);
                     neurons[prevNeuronIdx].outgoingConnection.Add(connection.Idx);
@@ -545,6 +546,8 @@ namespace Dabas.NeuralNetwork
                                     int hashIdx = (k1 + filter / 2) * filter + (k2 + filter / 2);
                                     int cIdx = filterConnections[hashIdx];
                                     connections[cIdx].srcDest[idx] = neuron.Idx;
+                                    neurons[idx].outgoingConnection.Add(cIdx);
+                                    neurons[neuron.Idx].incommingConnection.Add(cIdx);
                                 }
                         }
                 }
@@ -570,6 +573,7 @@ namespace Dabas.NeuralNetwork
                     for (int j = 0; j < dimIn; j += currLayerData.stride)
                     {
                         Neuron neuron = new Neuron(tFuncType);
+                        neuron.Idx = neuronCounter;
                         neurons[neuronCounter++] = neuron;
                         neuronIdxs.Add(neuron.Idx);
                         for (int k1 = 0; k1 < currLayerData.size; k1++)
@@ -581,6 +585,8 @@ namespace Dabas.NeuralNetwork
                                 int hashIdx = k1 * currLayerData.size + k2;
                                 int cIdx = filterConnections[hashIdx];
                                 connections[cIdx].srcDest[idx] = neuron.Idx;
+                                neurons[idx].outgoingConnection.Add(cIdx);
+                                neurons[neuron.Idx].incommingConnection.Add(cIdx);
                             }
                     }
             }
@@ -641,7 +647,7 @@ namespace Dabas.NeuralNetwork
                 else if (layerData is LayerData.RELU)
                 {
                     List<Layer> currSubLayers = new List<Layer>();
-                    lastLayer = new Layer(TransferFuncType.LINEAR);
+                    lastLayer = new Layer(TransferFuncType.RECTILINEAR);
                     foreach (Layer subLayer in lastSubLayers)
                     {
                         Layer layerTmp = new Layer(subLayer, layerData, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, weightRescaleFactor);
@@ -746,6 +752,8 @@ namespace Dabas.NeuralNetwork
                     }
                 }
                 connections[cFinalIdx].weight = 1;
+                output = finalOut;
+                return output;
             }
             if (tFuncType != TransferFuncType.NONE)
                 input += bias;

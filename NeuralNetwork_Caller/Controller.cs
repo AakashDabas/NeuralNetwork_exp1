@@ -131,16 +131,22 @@ namespace NeuralNetwork_Caller
             {
                 filters = new int[]
                 {
-                    3, 3, 3
+                    3, 3, 5
                 },
                 stride = 3
+            };
+            LayerData.RELU relu1 = new LayerData.RELU();
+            LayerData.MaxPool maxPool1 = new LayerData.MaxPool()
+            {
+                size = 2,
+                stride = 2
             };
             LayerData.FullyConnected outputLayer = new LayerData.FullyConnected()
             {
                 cntNeurons = 10,
                 tFuncType = TransferFuncType.SIGMOID
             };
-            NeuralNetwork nn = new NeuralNetwork(limit, 1, true, inputLayer, conv1, outputLayer);
+            NeuralNetwork nn = new NeuralNetwork(limit, 1000.0, true, inputLayer, conv1, outputLayer);
             //NeuralNetwork nn = NeuralNetwork.Load("Testing5.xml", true);
             //NeuralNetwork nn = new NeuralNetwork(new int[] { 784, 20, 10 },
             //                       new TransferFuncType[] { TransferFuncType.NONE, TransferFuncType.SIGMOID, TransferFuncType.SOFTMAX }, 60000, 100);
@@ -150,8 +156,8 @@ namespace NeuralNetwork_Caller
             for (int i = nn.trainingCounter; i < limit; i++)
             {
                 error = 0;
-                double learningRate = 0.2;
-                double momentum = 0.05;
+                double learningRate = 0.009;
+                double momentum = 0.005;
                 bool displayOutput = false;
                 if (i % (limit > 10 ? limit / 1000 : 1) == 0)
                 {
