@@ -22,7 +22,7 @@ namespace Dabas.NeuralNetwork_UI
         System.Timers.Timer updateTimer;
         double zoomScale = 1;
         public string outputText = "";
-        Semaphore textUpdateSemaphore = new Semaphore(1, 1);
+        Semaphore graphDataSemaphore = new Semaphore(1, 1);
         public Semaphore graphUpdateSemaphore = new Semaphore(1, 1);
 
         delegate void UpdateCall();
@@ -132,7 +132,7 @@ namespace Dabas.NeuralNetwork_UI
             series1.Legend = "Legend1";
             series1.Name = "Series1";
             this.errorGraph.Series.Add(series1);
-            this.errorGraph.Size = new System.Drawing.Size(945, 465);
+            this.errorGraph.Size = new System.Drawing.Size(743, 249);
             this.errorGraph.TabIndex = 5;
             this.errorGraph.Text = "errorGraph";
             // 
@@ -173,10 +173,10 @@ namespace Dabas.NeuralNetwork_UI
             this.outputBox.Font = new System.Drawing.Font("Corbel", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.outputBox.ForeColor = System.Drawing.Color.White;
             this.outputBox.Location = new System.Drawing.Point(12, 12);
-            this.outputBox.MinimumSize = new System.Drawing.Size(950, 140);
+            this.outputBox.MinimumSize = new System.Drawing.Size(550, 140);
             this.outputBox.Name = "outputBox";
             this.outputBox.ReadOnly = true;
-            this.outputBox.Size = new System.Drawing.Size(950, 204);
+            this.outputBox.Size = new System.Drawing.Size(748, 204);
             this.outputBox.TabIndex = 8;
             this.outputBox.Text = "";
             // 
@@ -186,7 +186,7 @@ namespace Dabas.NeuralNetwork_UI
             | System.Windows.Forms.AnchorStyles.Right)));
             this.trainingProgressBar.Location = new System.Drawing.Point(115, 223);
             this.trainingProgressBar.Name = "trainingProgressBar";
-            this.trainingProgressBar.Size = new System.Drawing.Size(847, 12);
+            this.trainingProgressBar.Size = new System.Drawing.Size(645, 12);
             this.trainingProgressBar.Step = 1;
             this.trainingProgressBar.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
             this.trainingProgressBar.TabIndex = 11;
@@ -198,7 +198,7 @@ namespace Dabas.NeuralNetwork_UI
             this.trainingLabel.ForeColor = System.Drawing.Color.Black;
             this.trainingLabel.Location = new System.Drawing.Point(17, 220);
             this.trainingLabel.Name = "trainingLabel";
-            this.trainingLabel.Size = new System.Drawing.Size(80, 16);
+            this.trainingLabel.Size = new System.Drawing.Size(95, 20);
             this.trainingLabel.TabIndex = 12;
             this.trainingLabel.Text = "TRAINING";
             // 
@@ -212,14 +212,14 @@ namespace Dabas.NeuralNetwork_UI
             this.trainingPer.ForeColor = System.Drawing.Color.Black;
             this.trainingPer.Location = new System.Drawing.Point(508, 219);
             this.trainingPer.Name = "trainingPer";
-            this.trainingPer.Size = new System.Drawing.Size(27, 16);
+            this.trainingPer.Size = new System.Drawing.Size(33, 20);
             this.trainingPer.TabIndex = 13;
             this.trainingPer.Text = "0%";
             // 
             // NNUIFORM
             // 
             this.BackColor = System.Drawing.Color.White;
-            this.ClientSize = new System.Drawing.Size(984, 719);
+            this.ClientSize = new System.Drawing.Size(782, 503);
             this.Controls.Add(this.trainingPer);
             this.Controls.Add(this.trainingLabel);
             this.Controls.Add(this.trainingProgressBar);
@@ -229,7 +229,7 @@ namespace Dabas.NeuralNetwork_UI
             this.Controls.Add(this.errorGraph);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ForeColor = System.Drawing.Color.SeaShell;
-            this.MinimumSize = new System.Drawing.Size(1000, 700);
+            this.MinimumSize = new System.Drawing.Size(800, 550);
             this.Name = "NNUIFORM";
             this.Text = "Neural Network UI";
             ((System.ComponentModel.ISupportInitialize)(this.errorGraph)).EndInit();
@@ -244,7 +244,9 @@ namespace Dabas.NeuralNetwork_UI
         {
             if (errorGraph.InvokeRequired)
             {
+                graphDataSemaphore.WaitOne();
                 errorGraph.BeginInvoke(new UpdateCall(UpdateErrorGraph));
+                graphDataSemaphore.Release();
             }
             else
             {
@@ -253,7 +255,7 @@ namespace Dabas.NeuralNetwork_UI
                 if (xAxisData.Count != yAxisData.Count)
                     return;
 
-                while (xAxisData.Count != 0)
+                while (xAxisData.Count != 0 && yAxisData.Count != 0)
                 {
                     double x, y;
                     x = xAxisData.Dequeue();

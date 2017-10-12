@@ -36,8 +36,7 @@ namespace Dabas.NeuralNetwork
 
         class NeuralNetworkArgs
         {
-            public int[] layersCnt;
-            public TransferFuncType[] tFuncType;
+            public object[] layersData;
             public int intendedTrainingCnt = 0;
         }
 
@@ -49,6 +48,7 @@ namespace Dabas.NeuralNetwork
 
             args = new NeuralNetworkArgs();
             args.intendedTrainingCnt = intendedTrainingCnt;
+            args.layersData = layersData;
 
             xAxisData = new Queue<double>();
             yAxisData = new Queue<double>();
@@ -118,8 +118,7 @@ namespace Dabas.NeuralNetwork
                     neurons[idx].output /= softMaxDenominator;
                     if (double.IsNaN(neurons[idx].output))
                     {
-                        output = null;
-                        return;
+                        neurons[idx].output = 0;
                     }
                 }
 
@@ -257,6 +256,7 @@ namespace Dabas.NeuralNetwork
                         wrong++;
                 }
                 yAxisData.Enqueue(wrong / (correct + wrong));
+
                 //yAxisData.Enqueue(prevErrorSum / prevErrors.Count);
             }
             ui.nnUIForm.graphUpdateSemaphore.Release();
@@ -305,13 +305,44 @@ namespace Dabas.NeuralNetwork
             writer.WriteAttributeString("Name", networkName);
 
             writer.WriteStartElement("Layers");
-            writer.WriteAttributeString("Count", args.layersCnt.Length.ToString());
-            for (int i = 0; i < args.layersCnt.Length; i++)
+            writer.WriteAttributeString("Count", args.layersData.Length.ToString());
+            for (int i = 0; i < args.layersData.Length; i++)
             {
+                object layerData = args.layersData[i];
                 writer.WriteStartElement("Layer");
-                writer.WriteAttributeString("Type", args.tFuncType[i].ToString());
-                writer.WriteAttributeString("Neurons", args.layersCnt[i].ToString());
                 writer.WriteAttributeString("Index", i.ToString());
+                if (layerData is LayerData.RELU)
+                {
+                    writer.WriteAttributeString("Type", "RELU");
+                }
+                else if (layerData is LayerData.MaxPool)
+                {
+                    writer.WriteAttributeString("Type", "MAXPOOL");
+                    writer.WriteAttributeString("Size", ((LayerData.MaxPool)layerData).size.ToString());
+                    writer.WriteAttributeString("Stride", ((LayerData.MaxPool)layerData).stride.ToString());
+                }
+                else if (layerData is LayerData.FullyConnected)
+                {
+                    LayerData.FullyConnected currLayerData = (LayerData.FullyConnected)layerData;
+                    writer.WriteAttributeString("Type", "FULLYCONNECTED");
+                    writer.WriteAttributeString("Neurons", currLayerData.cntNeurons.ToString());
+                    writer.WriteAttributeString("NeuronType", currLayerData.tFuncType.ToString());
+                }
+                else if (layerData is LayerData.Convolutional)
+                {
+                    LayerData.Convolutional currLayerData = (LayerData.Convolutional)layerData;
+                    writer.WriteAttributeString("Type", "CONVOLUTIONAL");
+                    writer.WriteAttributeString("Stride", currLayerData.stride.ToString());
+                    writer.WriteStartElement("Filters");
+                    writer.WriteAttributeString("Count", currLayerData.filters.Length.ToString());
+                    foreach (int filter in currLayerData.filters)
+                    {
+                        writer.WriteStartElement("Filter");
+                        writer.WriteAttributeString("Size", filter.ToString());
+                        writer.WriteEndElement();
+                    }
+                    writer.WriteEndElement();
+                }
                 writer.WriteEndElement();
             }
             writer.WriteEndElement(); // Layers
@@ -321,8 +352,8 @@ namespace Dabas.NeuralNetwork
             foreach (Neuron neuron in neurons.Values)
             {
                 writer.WriteStartElement("Neuron");
-                writer.WriteAttributeString("Bias", neuron.bias.ToString());
                 writer.WriteAttributeString("Index", neuron.Idx.ToString());
+                writer.WriteAttributeString("Bias", neuron.bias.ToString());
                 writer.WriteEndElement();
             }
             writer.WriteEndElement(); // Neurons
@@ -334,11 +365,11 @@ namespace Dabas.NeuralNetwork
                 foreach (int src in connection.srcDest.Keys)
                 {
                     writer.WriteStartElement("Connection");
-                    writer.WriteAttributeString("PreviousWeightDelta", connection.previousWeightDelta.ToString());
-                    writer.WriteAttributeString("Destination", connection.srcDest[src].ToString());
-                    writer.WriteAttributeString("Source", src.ToString());
-                    writer.WriteAttributeString("Weight", connection.weight.ToString());
                     writer.WriteAttributeString("Index", connection.Idx.ToString());
+                    writer.WriteAttributeString("Source", src.ToString());
+                    writer.WriteAttributeString("Destination", connection.srcDest[src].ToString());
+                    writer.WriteAttributeString("Weight", connection.weight.ToString());
+                    writer.WriteAttributeString("PreviousWeightDelta", connection.previousWeightDelta.ToString());
                     writer.WriteEndElement();
                 }
             }
@@ -352,67 +383,101 @@ namespace Dabas.NeuralNetwork
             this.RegisterOutput("Saved Neural Network : " + networkName);
         }
 
-        //public static NeuralNetwork Load(string filePath, bool showNNUI = false)
-        //{
-        //    XmlDocument doc = new XmlDocument();
-        //    try
-        //    {
-        //        doc.Load(filePath);
-        //    }
-        //    catch
-        //    {
-        //        throw new Exception("Invalid filepath given to NeuralNetwork.Load() !");
-        //    }
+        public static NeuralNetwork Load(string filePath, bool showNNUI = false)
+        {
+            XmlDocument doc = new XmlDocument();
+            try
+            {
+                doc.Load(filePath);
+            }
+            catch
+            {
+                throw new Exception("Invalid filepath given to NeuralNetwork.Load() !");
+            }
 
-        //    int trainingCounter;
-        //    int layerCnt = 0;
-        //    NeuralNetworkArgs args = new NeuralNetworkArgs();
+            int trainingCounter;
+            int layerCnt = 0;
+            NeuralNetworkArgs args = new NeuralNetworkArgs();
 
-        //    string basePath = "NeuralNetwork/";
-        //    int.TryParse(XPathValue(basePath + "@TrainingDone", ref doc), out trainingCounter);
-        //    int.TryParse(XPathValue(basePath + "@IndendedTrainingCnt", ref doc), out args.intendedTrainingCnt);
-        //    basePath += "Layers/";
+            string basePath = "NeuralNetwork/";
+            int.TryParse(XPathValue(basePath + "@TrainingDone", ref doc), out trainingCounter);
+            int.TryParse(XPathValue(basePath + "@IndendedTrainingCnt", ref doc), out args.intendedTrainingCnt);
+            basePath += "Layers/";
 
-        //    int.TryParse(XPathValue(basePath + "@Count", ref doc), out layerCnt);
-        //    args.layersCnt = new int[layerCnt];
-        //    args.tFuncType = new TransferFuncType[layerCnt];
+            int.TryParse(XPathValue(basePath + "@Count", ref doc), out layerCnt);
+            args.layersData = new object[layerCnt];
 
-        //    basePath += "Layer[@Index='{0}']/@{1}";
-        //    for (int i = 0; i < layerCnt; i++)
-        //    {
-        //        int.TryParse(XPathValue(string.Format(basePath, i.ToString(), "Neurons"), ref doc), out args.layersCnt[i]);
-        //        Enum.TryParse<TransferFuncType>(XPathValue(string.Format(basePath, i.ToString(), "Type"), ref doc), out args.tFuncType[i]);
-        //    }
+            basePath += "Layer[@Index='{0}']/@{1}";
+            XmlNodeList layerList = doc.SelectNodes("NeuralNetwork/Layers/Layer");
+            for (int i = 0; i < layerCnt; i++)
+            {
+                XmlNode layerNode = layerList[i];
+                switch (layerNode.Attributes["Type"].Value)
+                {
+                    case "RELU":
+                        LayerData.RELU reluLayer = new LayerData.RELU();
+                        args.layersData[i] = reluLayer;
+                        break;
+                    case "MAXPOOL":
+                        LayerData.MaxPool maxpoolLayer = new LayerData.MaxPool();
+                        int.TryParse(layerNode.Attributes["Size"].Value, out maxpoolLayer.size);
+                        int.TryParse(layerNode.Attributes["Stride"].Value, out maxpoolLayer.stride);
+                        args.layersData[i] = maxpoolLayer;
+                        break;
+                    case "FULLYCONNECTED":
+                        LayerData.FullyConnected fullyLayer = new LayerData.FullyConnected();
+                        int.TryParse(layerNode.Attributes["Neurons"].Value, out fullyLayer.cntNeurons);
+                        Enum.TryParse<TransferFuncType>(layerNode.Attributes["NeuronType"].Value, out fullyLayer.tFuncType);
+                        args.layersData[i] = fullyLayer;
+                        break;
+                    case "CONVOLUTIONAL":
+                        LayerData.Convolutional convolutionalLayer = new LayerData.Convolutional();
+                        int.TryParse(layerNode.Attributes["Stride"].Value, out convolutionalLayer.stride);
+                        XmlDocument filterXml = new XmlDocument();
+                        filterXml.LoadXml(layerNode.OuterXml);
+                        XmlNodeList filterList = filterXml.SelectNodes("Layer/Filters/Filter");
+                        convolutionalLayer.filters = new int[filterList.Count];
+                        int j = 0;
+                        foreach (XmlNode filterNode in filterList)
+                        {
+                            int.TryParse(filterNode.Attributes["Size"].Value, out convolutionalLayer.filters[j++]);
+                        }
+                        args.layersData[i] = convolutionalLayer;
+                        break;
+                    default:
+                        throw new Exception("Invalid Layer Type Entry Found!!!");
+                }
+            }
 
-        //    NeuralNetwork nn = new NeuralNetwork(args.layersCnt, args.tFuncType, args.intendedTrainingCnt, 1, showNNUI);
-        //    int.TryParse(XPathValue("NeuralNetwork/@TrainingDone", ref doc), out nn.trainingCounter);
+            NeuralNetwork nn = new NeuralNetwork(args.intendedTrainingCnt, 1, showNNUI, args.layersData);
+            int.TryParse(XPathValue("NeuralNetwork/@TrainingDone", ref doc), out nn.trainingCounter);
 
-        //    nn.RegisterOutput("Loading Neurons");
-        //    basePath = "NeuralNetwork/Neurons/Neuron[@Index='{0}']/@Bias";
-        //    int neuronCnt;
-        //    int.TryParse(XPathValue("NeuralNetwork/Neurons/@Count", ref doc), out neuronCnt);
-        //    for (int i = 0; i < neuronCnt; i++)
-        //    {
-        //        double.TryParse(XPathValue(string.Format(basePath, i.ToString()), ref doc), out nn.neurons[i].bias);
-        //    }
-        //    nn.RegisterOutput("Loading Connections");
-        //    basePath = "NeuralNetwork/Connections/Connection[@Index='{0}']/@{1}";
+            nn.RegisterOutput("Loading Neurons");
+            basePath = "NeuralNetwork/Neurons/Neuron[@Index='{0}']/@Bias";
+            int neuronCnt;
+            int.TryParse(XPathValue("NeuralNetwork/Neurons/@Count", ref doc), out neuronCnt);
+            for (int i = 0; i < neuronCnt; i++)
+            {
+                double.TryParse(XPathValue(string.Format(basePath, i.ToString()), ref doc), out nn.neurons[i].bias);
+            }
+            nn.RegisterOutput("Loading Connections");
+            basePath = "NeuralNetwork/Connections/Connection[@Index='{0}']/@{1}";
 
-        //    XmlNodeList connectionList = doc.SelectNodes("NeuralNetwork/Connections/Connection");
-        //    foreach (XmlNode connection in connectionList)
-        //    {
-        //        int idx, src, dest;
-        //        int.TryParse(connection.Attributes["Index"].Value, out idx);
-        //        int.TryParse(connection.Attributes["Source"].Value, out src);
-        //        int.TryParse(connection.Attributes["Destination"].Value, out dest);
-        //        double.TryParse(connection.Attributes["Weight"].Value, out nn.connections[idx].weight);
-        //        double.TryParse(connection.Attributes["PreviousWeightDelta"].Value, out nn.connections[idx].previousWeightDelta);
-        //        nn.connections[idx].srcDest[src] = dest;
-        //    }
-        //    nn.RegisterOutput("Neural Network : " + XPathValue("NeuralNetwork/@Name", ref doc) + "Loaded Successfully : )");
-        //    doc = null;
-        //    return nn;
-        //}
+            XmlNodeList connectionList = doc.SelectNodes("NeuralNetwork/Connections/Connection");
+            foreach (XmlNode connection in connectionList)
+            {
+                int idx, src, dest;
+                int.TryParse(connection.Attributes["Index"].Value, out idx);
+                int.TryParse(connection.Attributes["Source"].Value, out src);
+                int.TryParse(connection.Attributes["Destination"].Value, out dest);
+                double.TryParse(connection.Attributes["Weight"].Value, out nn.connections[idx].weight);
+                double.TryParse(connection.Attributes["PreviousWeightDelta"].Value, out nn.connections[idx].previousWeightDelta);
+                nn.connections[idx].srcDest[src] = dest;
+            }
+            nn.RegisterOutput("Neural Network : " + XPathValue("NeuralNetwork/@Name", ref doc) + "Loaded Successfully : )");
+            doc = null;
+            return nn;
+        }
 
         private static string XPathValue(string xPath, ref XmlDocument doc)
         {
@@ -490,6 +555,7 @@ namespace Dabas.NeuralNetwork
                 foreach (int prevNeuronIdx in previousLayer.neuronIdxs)
                 {
                     Neuron neuron = new Neuron(tFuncType);
+                    neuron.biasAllowed = false;
                     Connection connection = new Connection(ref connections, ref connectionCounter, weightRescaleFactor, false);
                     connection.weight = 1;
                     neuron.Idx = neuronCounter;
@@ -527,6 +593,8 @@ namespace Dabas.NeuralNetwork
                         {
                             Connection connection = new Connection(ref connections, ref connectionCounter, weightRescaleFactor);
                             int hashIdx = (k1 + filter / 2) * filter + (k2 + filter / 2);
+                            connection.weight = 1;
+                            connection.updateAllowed = false;
                             filterConnections[hashIdx] = connection.Idx;
                         }
                     // Zero padding is introduced for area which is not completly overlapped by filter
@@ -535,6 +603,7 @@ namespace Dabas.NeuralNetwork
                         {
                             Neuron neuron = new Neuron(tFuncType);
                             neuron.Idx = neuronCounter;
+                            neuron.biasAllowed = false;
                             neurons[neuronCounter++] = neuron;
                             neuronIdxs.Add(neuron.Idx);
                             for (int k1 = -filter / 2; k1 <= filter / 2; k1++)
@@ -558,24 +627,28 @@ namespace Dabas.NeuralNetwork
                 this.tFuncType = TransferFuncType.MAXPOOL;
                 neuronIdxs = new List<int>();
                 int dimIn = (int)Math.Sqrt(previousLayer.cntNeurons);
-                // Form connections for each filter
-                Dictionary<int, int> filterConnections = new Dictionary<int, int>();
-                for (int k1 = 0; k1 < currLayerData.size; k1++)
-                    for (int k2 = 0; k2 < currLayerData.size; k2++)
-                    {
-                        Connection connection = new Connection(ref connections, ref connectionCounter, 1, false);
-                        connection.weight = 1;
-                        int hashIdx = k1 * currLayerData.size + k2;
-                        filterConnections[hashIdx] = connection.Idx;
-                    }
+
                 // Zero padding is introduced for area which is not completly overlapped by filter
                 for (int i = 0; i < dimIn; i += currLayerData.stride)
                     for (int j = 0; j < dimIn; j += currLayerData.stride)
                     {
                         Neuron neuron = new Neuron(tFuncType);
+                        neuron.biasAllowed = false;
                         neuron.Idx = neuronCounter;
                         neurons[neuronCounter++] = neuron;
                         neuronIdxs.Add(neuron.Idx);
+
+                        Dictionary<int, int> filterConnections = new Dictionary<int, int>();
+                        for (int k1 = 0; k1 < currLayerData.size; k1++)
+                            for (int k2 = 0; k2 < currLayerData.size; k2++)
+                            {
+                                Connection connection = new Connection(ref connections, ref connectionCounter, 1, false);
+                                connection.weight = 1;
+                                int hashIdx = k1 * currLayerData.size + k2;
+                                filterConnections[hashIdx] = connection.Idx;
+                            }
+
+                        // Form new connections
                         for (int k1 = 0; k1 < currLayerData.size; k1++)
                             for (int k2 = 0; k2 < currLayerData.size; k2++)
                             {
@@ -691,6 +764,7 @@ namespace Dabas.NeuralNetwork
         public int Idx;
         public List<int> incommingConnection, outgoingConnection;
         public TransferFuncType tFuncType;
+        public bool biasAllowed;
 
         private void INIT(TransferFuncType tFuncType)
         {
@@ -700,6 +774,7 @@ namespace Dabas.NeuralNetwork
             deltaBias = 0;
             bias = Gaussian.GetRandomGaussian();
             this.tFuncType = tFuncType;
+            biasAllowed = true;
 
             incommingConnection = new List<int>();
             outgoingConnection = new List<int>();
@@ -734,6 +809,8 @@ namespace Dabas.NeuralNetwork
 
         public double Evaluate(ref Dictionary<int, Neuron> neurons, ref Dictionary<int, Connection> connections)
         {
+            if (!biasAllowed)
+                bias = 0;
             if (tFuncType == TransferFuncType.MAXPOOL)
             {
                 int cFinalIdx = -1;

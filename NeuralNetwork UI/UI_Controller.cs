@@ -41,12 +41,8 @@ namespace Dabas.NeuralNetwork_UI
             }
             else
             {
-                lock (nnUIForm.outputBox)
-                {
                     if (nnUIForm.outputBox.SelectedText == "")
                         nnUIForm.outputBox.Text += System.DateTime.Now.ToString() + " | " + text + "\n";
-                }
-
             }
         }
 
