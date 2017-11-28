@@ -33,11 +33,17 @@ namespace Dabas.NeuralNetwork_UI
         public RichTextBox outputBox;
         public ProgressBar trainingProgressBar;
         private Label trainingLabel;
+        private Label label1;
+        private Label label2;
+        public TextBox rateInput;
+        public TextBox momentumInput;
         public Label trainingPer;
+        private Button button1;
+        Callback _callback;
 
-
-        public NNUIFORM()
+        public NNUIFORM(Callback _callback)
         {
+            this._callback = _callback;
             InitializeComponent();
             updateTimer = new System.Timers.Timer();
             updateTimer.Enabled = true;
@@ -96,9 +102,9 @@ namespace Dabas.NeuralNetwork_UI
 
         private void InitializeComponent()
         {
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea3 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend3 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series series3 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.errorGraph = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.downArrow = new System.Windows.Forms.PictureBox();
             this.upArrow = new System.Windows.Forms.PictureBox();
@@ -106,6 +112,11 @@ namespace Dabas.NeuralNetwork_UI
             this.trainingProgressBar = new System.Windows.Forms.ProgressBar();
             this.trainingLabel = new System.Windows.Forms.Label();
             this.trainingPer = new System.Windows.Forms.Label();
+            this.label1 = new System.Windows.Forms.Label();
+            this.label2 = new System.Windows.Forms.Label();
+            this.rateInput = new System.Windows.Forms.TextBox();
+            this.momentumInput = new System.Windows.Forms.TextBox();
+            this.button1 = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.errorGraph)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.downArrow)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.upArrow)).BeginInit();
@@ -122,17 +133,17 @@ namespace Dabas.NeuralNetwork_UI
             this.errorGraph.BorderlineColor = System.Drawing.Color.DimGray;
             this.errorGraph.BorderlineDashStyle = System.Windows.Forms.DataVisualization.Charting.ChartDashStyle.Solid;
             this.errorGraph.BorderlineWidth = 2;
-            chartArea1.Name = "ChartArea1";
-            this.errorGraph.ChartAreas.Add(chartArea1);
-            legend1.Name = "Legend1";
-            this.errorGraph.Legends.Add(legend1);
+            chartArea3.Name = "ChartArea1";
+            this.errorGraph.ChartAreas.Add(chartArea3);
+            legend3.Name = "Legend1";
+            this.errorGraph.Legends.Add(legend3);
             this.errorGraph.Location = new System.Drawing.Point(17, 242);
             this.errorGraph.Name = "errorGraph";
-            series1.ChartArea = "ChartArea1";
-            series1.Legend = "Legend1";
-            series1.Name = "Series1";
-            this.errorGraph.Series.Add(series1);
-            this.errorGraph.Size = new System.Drawing.Size(743, 249);
+            series3.ChartArea = "ChartArea1";
+            series3.Legend = "Legend1";
+            series3.Name = "Series1";
+            this.errorGraph.Series.Add(series3);
+            this.errorGraph.Size = new System.Drawing.Size(897, 363);
             this.errorGraph.TabIndex = 5;
             this.errorGraph.Text = "errorGraph";
             // 
@@ -176,7 +187,7 @@ namespace Dabas.NeuralNetwork_UI
             this.outputBox.MinimumSize = new System.Drawing.Size(550, 140);
             this.outputBox.Name = "outputBox";
             this.outputBox.ReadOnly = true;
-            this.outputBox.Size = new System.Drawing.Size(748, 204);
+            this.outputBox.Size = new System.Drawing.Size(902, 204);
             this.outputBox.TabIndex = 8;
             this.outputBox.Text = "";
             // 
@@ -186,7 +197,7 @@ namespace Dabas.NeuralNetwork_UI
             | System.Windows.Forms.AnchorStyles.Right)));
             this.trainingProgressBar.Location = new System.Drawing.Point(115, 223);
             this.trainingProgressBar.Name = "trainingProgressBar";
-            this.trainingProgressBar.Size = new System.Drawing.Size(645, 12);
+            this.trainingProgressBar.Size = new System.Drawing.Size(799, 12);
             this.trainingProgressBar.Step = 1;
             this.trainingProgressBar.Style = System.Windows.Forms.ProgressBarStyle.Continuous;
             this.trainingProgressBar.TabIndex = 11;
@@ -198,7 +209,7 @@ namespace Dabas.NeuralNetwork_UI
             this.trainingLabel.ForeColor = System.Drawing.Color.Black;
             this.trainingLabel.Location = new System.Drawing.Point(17, 220);
             this.trainingLabel.Name = "trainingLabel";
-            this.trainingLabel.Size = new System.Drawing.Size(95, 20);
+            this.trainingLabel.Size = new System.Drawing.Size(80, 16);
             this.trainingLabel.TabIndex = 12;
             this.trainingLabel.Text = "TRAINING";
             // 
@@ -212,14 +223,78 @@ namespace Dabas.NeuralNetwork_UI
             this.trainingPer.ForeColor = System.Drawing.Color.Black;
             this.trainingPer.Location = new System.Drawing.Point(508, 219);
             this.trainingPer.Name = "trainingPer";
-            this.trainingPer.Size = new System.Drawing.Size(33, 20);
+            this.trainingPer.Size = new System.Drawing.Size(27, 16);
             this.trainingPer.TabIndex = 13;
             this.trainingPer.Text = "0%";
+            // 
+            // label1
+            // 
+            this.label1.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
+            this.label1.AutoSize = true;
+            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.ForeColor = System.Drawing.Color.Black;
+            this.label1.Location = new System.Drawing.Point(16, 626);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(99, 18);
+            this.label1.TabIndex = 14;
+            this.label1.Text = "Learning Rate";
+            // 
+            // label2
+            // 
+            this.label2.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
+            this.label2.AutoSize = true;
+            this.label2.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label2.ForeColor = System.Drawing.Color.Black;
+            this.label2.Location = new System.Drawing.Point(298, 626);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(84, 18);
+            this.label2.TabIndex = 15;
+            this.label2.Text = "Momentum";
+            // 
+            // rateInput
+            // 
+            this.rateInput.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
+            this.rateInput.BackColor = System.Drawing.SystemColors.InactiveCaption;
+            this.rateInput.Font = new System.Drawing.Font("Bahnschrift", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.rateInput.ForeColor = System.Drawing.Color.DarkCyan;
+            this.rateInput.Location = new System.Drawing.Point(121, 626);
+            this.rateInput.Name = "rateInput";
+            this.rateInput.Size = new System.Drawing.Size(100, 23);
+            this.rateInput.TabIndex = 16;
+            // 
+            // momentumInput
+            // 
+            this.momentumInput.Anchor = System.Windows.Forms.AnchorStyles.Bottom;
+            this.momentumInput.BackColor = System.Drawing.SystemColors.InactiveCaption;
+            this.momentumInput.Font = new System.Drawing.Font("Bahnschrift", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.momentumInput.ForeColor = System.Drawing.Color.DarkCyan;
+            this.momentumInput.Location = new System.Drawing.Point(388, 626);
+            this.momentumInput.Name = "momentumInput";
+            this.momentumInput.Size = new System.Drawing.Size(100, 23);
+            this.momentumInput.TabIndex = 17;
+            // 
+            // button1
+            // 
+            this.button1.BackColor = System.Drawing.Color.DodgerBlue;
+            this.button1.ForeColor = System.Drawing.Color.White;
+            this.button1.Location = new System.Drawing.Point(566, 626);
+            this.button1.Name = "button1";
+            this.button1.Size = new System.Drawing.Size(89, 23);
+            this.button1.TabIndex = 18;
+            this.button1.Text = "UPDATE";
+            this.button1.UseVisualStyleBackColor = false;
+            this.button1.Click += new System.EventHandler(this.button1_Click);
             // 
             // NNUIFORM
             // 
             this.BackColor = System.Drawing.Color.White;
-            this.ClientSize = new System.Drawing.Size(782, 503);
+            this.ClientSize = new System.Drawing.Size(938, 660);
+            this.ControlBox = false;
+            this.Controls.Add(this.button1);
+            this.Controls.Add(this.momentumInput);
+            this.Controls.Add(this.rateInput);
+            this.Controls.Add(this.label2);
+            this.Controls.Add(this.label1);
             this.Controls.Add(this.trainingPer);
             this.Controls.Add(this.trainingLabel);
             this.Controls.Add(this.trainingProgressBar);
@@ -229,6 +304,7 @@ namespace Dabas.NeuralNetwork_UI
             this.Controls.Add(this.errorGraph);
             this.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ForeColor = System.Drawing.Color.SeaShell;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
             this.MinimumSize = new System.Drawing.Size(800, 550);
             this.Name = "NNUIFORM";
             this.Text = "Neural Network UI";
@@ -277,7 +353,7 @@ namespace Dabas.NeuralNetwork_UI
             chartArea.AxisY.ScaleView.Zoomable = true;
             zoomScale *= 2;
             double lowerLimit = chartArea.AxisY.Minimum * zoomScale;
-            double upperLimit = chartArea.AxisX.Maximum * zoomScale;
+            double upperLimit = chartArea.AxisY.Maximum * zoomScale;
             chartArea.AxisY.ScaleView.Zoom(lowerLimit * zoomScale, upperLimit * zoomScale);
         }
 
@@ -288,6 +364,12 @@ namespace Dabas.NeuralNetwork_UI
             double lowerLimit = chartArea.AxisY.Minimum * zoomScale;
             double upperLimit = chartArea.AxisY.Maximum * zoomScale;
             chartArea.AxisY.ScaleView.Zoom(lowerLimit * zoomScale, upperLimit * zoomScale);
+        }
+
+        private void button1_Click(object sender, EventArgs e)
+        {
+            _callback("Momentum", momentumInput.Text);
+            _callback("LearningRate", rateInput.Text);
         }
 
         public void AddToChart(ref Queue<double> xAxisData, ref Queue<double> yAxisData)

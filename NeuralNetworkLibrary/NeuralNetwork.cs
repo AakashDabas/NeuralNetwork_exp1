@@ -18,6 +18,7 @@ namespace Dabas.NeuralNetwork
         double prevErrorSum = 0;
         public int batchSize = 1, batchUsed = 0;
         public bool ShowUi = true;
+        double learningRate, momentum, learningRateT, momentumT;
 
         List<Layer> layers;
         Dictionary<int, Neuron> neurons;
@@ -37,10 +38,12 @@ namespace Dabas.NeuralNetwork
         class NeuralNetworkArgs
         {
             public object[] layersData;
+            public double learningRate = 0;
+            public double momentum = 0;
             public int intendedTrainingCnt = 0;
         }
 
-        public NeuralNetwork(int intendedTrainingCnt, double weightRescaleFactor, bool showNNUI, params object[] layersData)
+        public NeuralNetwork(int intendedTrainingCnt, double weightRescaleFactor, double learningRate, double momentum, bool showNNUI, params object[] layersData)
         {
             layers = new List<Layer>();
             neurons = new Dictionary<int, Neuron>();
@@ -49,16 +52,28 @@ namespace Dabas.NeuralNetwork
             args = new NeuralNetworkArgs();
             args.intendedTrainingCnt = intendedTrainingCnt;
             args.layersData = layersData;
+            args.learningRate = learningRate;
+            args.momentum = momentum;
+            this.learningRate = learningRate;
+            this.momentum = momentum;
+            learningRateT = learningRate;
+            momentumT = momentum;
 
             xAxisData = new Queue<double>();
             yAxisData = new Queue<double>();
-            ui = new NeuralNetworkUI();
+            ui = new NeuralNetworkUI(CallbackHandler);
             ui.AddToChart(ref xAxisData, ref yAxisData);
             UIThread = new Thread(ui.StartUI);
             if (showNNUI)
                 UIThread.Start();
+            ui.SetLearningRate(learningRate.ToString());
+            ui.SetMomentum(momentum.ToString());
 
-            Layer.ConstructLayers(layersData, ref layers, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, weightRescaleFactor);
+            Layer.ConstructLayers(layersData, ref layers, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, learningRate, weightRescaleFactor);
+            foreach (Layer layer in layers)
+            {
+                RegisterOutput("Count Neurons : " + layer.cntNeurons);
+            }
 
             RegisterOutput("Neural Network Initialized");
         }
@@ -71,7 +86,7 @@ namespace Dabas.NeuralNetwork
             foreach (Neuron neuron in neurons.Values)
                 if (neuron.tFuncType == TransferFuncType.MAXPOOL)
                 {
-                    foreach (int cIdx in neuron.incommingConnection)
+                    foreach (int cIdx in neuron.incomingConnection)
                     {
                         connections[cIdx].weight = 1;
                     }
@@ -111,11 +126,13 @@ namespace Dabas.NeuralNetwork
                         buffer.Enqueue(dest);
                 }
             }
-
+            //Console.WriteLine("---------------------------------");
             if (layers.Last().tFuncType == TransferFuncType.SOFTMAX)
                 foreach (int idx in layers.Last().neuronIdxs)
                 {
+                    //Console.Write(neurons[idx].output);
                     neurons[idx].output /= softMaxDenominator;
+                    //Console.WriteLine("  :  " + neurons[idx].output);
                     if (double.IsNaN(neurons[idx].output))
                     {
                         neurons[idx].output = 0;
@@ -137,8 +154,15 @@ namespace Dabas.NeuralNetwork
             }
         }
 
-        public double Train(double[] input, double[] output, double learningRate, double momentum, bool displayOutput)
+        public double Train(double[] input, double[] output, bool displayOutput)
         {
+            if (learningRate != learningRateT || momentum != momentumT)
+            {
+                learningRate = learningRateT;
+                momentum = momentumT;
+                RegisterOutput(String.Format("Updated Learning Rate : {0:0.00000000}", learningRate));
+                RegisterOutput(String.Format("Updated Momentum      : {0:0.00000000}",momentum));
+            }
             trainingCounter++;
             // Check for valid input
             if (input.Length != layers[0].cntNeurons || output.Length != layers.Last().cntNeurons)
@@ -161,7 +185,7 @@ namespace Dabas.NeuralNetwork
             for (int itr = 0; itr < layers.Last().cntNeurons; itr++)
             {
                 Neuron neuron = neurons[layers.Last().neuronIdxs[itr]];
-                double error = neuron.output - output[itr];
+                double error = -neuron.output + output[itr];
                 totalError += error * error / 2.0;
                 neurons[neuron.Idx].deltaBack = error;
                 buffer.Enqueue(neuron.Idx);
@@ -175,7 +199,7 @@ namespace Dabas.NeuralNetwork
                 neurons[currIdx].deltaBack *= neurons[currIdx].EvaluateDerivative();
                 Neuron neuron = neurons[currIdx];
 
-                foreach (int idx in neuron.incommingConnection)
+                foreach (int idx in neuron.incomingConnection)
                 {
                     Connection connection = connections[idx];
                     double deltaBackward = connection.weight * neuron.deltaBack;
@@ -190,6 +214,8 @@ namespace Dabas.NeuralNetwork
             batchUsed++;
             foreach (Connection connection in connections.Values)
             {
+                //if (connection.Idx == 2670)
+                //    Console.Write(connection.weight);
                 if (connection.updateAllowed == false)
                     continue;
                 foreach (int srcIdx in connection.srcDest.Keys)
@@ -197,18 +223,30 @@ namespace Dabas.NeuralNetwork
                     Neuron src = neurons[srcIdx];
                     Neuron dest = neurons[connection.srcDest[srcIdx]];
 
-                    double weightDelta = -dest.deltaBack * src.output;
-                    connections[connection.Idx].weightDelta += weightDelta;
-                    neurons[srcIdx].deltaBias += -dest.deltaBack;
+                    double weightDelta = dest.deltaBack * src.output;
+                    connections[connection.Idx].weightDelta += weightDelta / connection.srcDest.Count;
+                    neurons[srcIdx].deltaBias += dest.deltaBack;
                 }
                 if (batchUsed == batchSize)
                 {
-                    double weightDelta = learningRate * connections[connection.Idx].weightDelta / (double)batchSize;
+                    double weightDelta = connections[connection.Idx].weightDelta / (double)batchSize;
+                    //if (connection.Idx == 2670)
+                    //    Console.Write(" : " + weightDelta);
                     if (weightDelta * connection.previousWeightDelta < 0)
+                    {
+                        connection.learningRate *= 0.9;
                         connection.previousWeightDelta *= 0.5;
-                    connections[connection.Idx].weight += weightDelta + momentum * connection.previousWeightDelta;
-                    connections[connection.Idx].previousWeightDelta = connection.previousWeightDelta + weightDelta;
+                    }
+                    else
+                        connection.learningRate *= 1.01;
+                    connection.learningRate = Math.Min(connection.learningRate, learningRate);
+                    connection.learningRate = Math.Max(connection.learningRate, 0.0000001);
+                    connections[connection.Idx].weight += learningRate * (weightDelta + momentum * connection.previousWeightDelta);
+                    connections[connection.Idx].previousWeightDelta = 0.9 * connections[connection.Idx].previousWeightDelta + 0.1 * weightDelta;
                     connections[connection.Idx].weightDelta = 0;
+                    connections[connection.Idx].learningRate = connection.learningRate;
+                    //if (connection.Idx == 2670)
+                    //    Console.WriteLine(" : " + connection.weight);
                 }
             }
             if (batchUsed == batchSize)
@@ -227,7 +265,7 @@ namespace Dabas.NeuralNetwork
             ui.nnUIForm.graphUpdateSemaphore.WaitOne();
             {
                 ui.SetProgressBar(trainingCounter, args.intendedTrainingCnt);
-                if (prevErrors.Count == 100)
+                if (prevErrors.Count == 1000)
                 {
                     prevErrorSum -= prevErrors.Dequeue();
                 }
@@ -261,6 +299,24 @@ namespace Dabas.NeuralNetwork
             }
             ui.nnUIForm.graphUpdateSemaphore.Release();
             return totalError;
+        }
+
+        void CallbackHandler(string paramType, string paramValue)
+        {
+            if (paramType == "LearningRate")
+                double.TryParse(paramValue, out learningRateT);
+            else if (paramType == "Momentum")
+                double.TryParse(paramValue, out momentumT);
+        }
+
+        public void SetLearningRate(double learningRate)
+        {
+            learningRateT = learningRate;
+        }
+
+        public void Momentum(double momentum)
+        {
+            momentumT = momentum;
         }
 
         public void WaitTillDone()
@@ -303,6 +359,8 @@ namespace Dabas.NeuralNetwork
             writer.WriteAttributeString("IndendedTrainingCnt", args.intendedTrainingCnt.ToString());
             writer.WriteAttributeString("TrainingDone", trainingCounter.ToString());
             writer.WriteAttributeString("Name", networkName);
+            writer.WriteAttributeString("LearningRate", args.learningRate.ToString());
+            writer.WriteAttributeString("Momentum", args.momentum.ToString());
 
             writer.WriteStartElement("Layers");
             writer.WriteAttributeString("Count", args.layersData.Length.ToString());
@@ -333,6 +391,7 @@ namespace Dabas.NeuralNetwork
                     LayerData.Convolutional currLayerData = (LayerData.Convolutional)layerData;
                     writer.WriteAttributeString("Type", "CONVOLUTIONAL");
                     writer.WriteAttributeString("Stride", currLayerData.stride.ToString());
+                    writer.WriteAttributeString("ZeroPadding", currLayerData.padding.ToString());
                     writer.WriteStartElement("Filters");
                     writer.WriteAttributeString("Count", currLayerData.filters.Length.ToString());
                     foreach (int filter in currLayerData.filters)
@@ -369,6 +428,7 @@ namespace Dabas.NeuralNetwork
                     writer.WriteAttributeString("Source", src.ToString());
                     writer.WriteAttributeString("Destination", connection.srcDest[src].ToString());
                     writer.WriteAttributeString("Weight", connection.weight.ToString());
+                    writer.WriteAttributeString("LearningRate", connection.learningRate.ToString());
                     writer.WriteAttributeString("PreviousWeightDelta", connection.previousWeightDelta.ToString());
                     writer.WriteEndElement();
                 }
@@ -397,11 +457,14 @@ namespace Dabas.NeuralNetwork
 
             int trainingCounter;
             int layerCnt = 0;
+            double learningRate = 0;
             NeuralNetworkArgs args = new NeuralNetworkArgs();
 
             string basePath = "NeuralNetwork/";
             int.TryParse(XPathValue(basePath + "@TrainingDone", ref doc), out trainingCounter);
             int.TryParse(XPathValue(basePath + "@IndendedTrainingCnt", ref doc), out args.intendedTrainingCnt);
+            double.TryParse(XPathValue(basePath + "@LearningRate", ref doc), out args.learningRate);
+            double.TryParse(XPathValue(basePath + "@Momentum", ref doc), out args.momentum);
             basePath += "Layers/";
 
             int.TryParse(XPathValue(basePath + "@Count", ref doc), out layerCnt);
@@ -433,6 +496,7 @@ namespace Dabas.NeuralNetwork
                     case "CONVOLUTIONAL":
                         LayerData.Convolutional convolutionalLayer = new LayerData.Convolutional();
                         int.TryParse(layerNode.Attributes["Stride"].Value, out convolutionalLayer.stride);
+                        bool.TryParse(layerNode.Attributes["ZeroPadding"].Value, out convolutionalLayer.padding);
                         XmlDocument filterXml = new XmlDocument();
                         filterXml.LoadXml(layerNode.OuterXml);
                         XmlNodeList filterList = filterXml.SelectNodes("Layer/Filters/Filter");
@@ -449,7 +513,7 @@ namespace Dabas.NeuralNetwork
                 }
             }
 
-            NeuralNetwork nn = new NeuralNetwork(args.intendedTrainingCnt, 1, showNNUI, args.layersData);
+            NeuralNetwork nn = new NeuralNetwork(args.intendedTrainingCnt, 1, args.learningRate, args.momentum, showNNUI, args.layersData);
             int.TryParse(XPathValue("NeuralNetwork/@TrainingDone", ref doc), out nn.trainingCounter);
 
             nn.RegisterOutput("Loading Neurons");
@@ -472,6 +536,7 @@ namespace Dabas.NeuralNetwork
                 int.TryParse(connection.Attributes["Destination"].Value, out dest);
                 double.TryParse(connection.Attributes["Weight"].Value, out nn.connections[idx].weight);
                 double.TryParse(connection.Attributes["PreviousWeightDelta"].Value, out nn.connections[idx].previousWeightDelta);
+                double.TryParse(connection.Attributes["LearningRate"].Value, out nn.connections[idx].learningRate);
                 nn.connections[idx].srcDest[src] = dest;
             }
             nn.RegisterOutput("Neural Network : " + XPathValue("NeuralNetwork/@Name", ref doc) + "Loaded Successfully : )");
@@ -514,6 +579,7 @@ namespace Dabas.NeuralNetwork
         {
             public int[] filters;
             public int stride;
+            public bool padding;
         }
 
         public class RELU
@@ -544,7 +610,8 @@ namespace Dabas.NeuralNetwork
         public Layer(Layer previousLayer, object layerData,
             ref Dictionary<int, Neuron> neurons, ref int neuronCounter,
             ref Dictionary<int, Connection> connections, ref int connectionCounter,
-            double weightRescaleFactor = 1)
+            double learningRate,
+            double weightRescaleFactor)
         {
             // Form connections based upon layer type
             if (layerData is LayerData.RELU)
@@ -556,11 +623,11 @@ namespace Dabas.NeuralNetwork
                 {
                     Neuron neuron = new Neuron(tFuncType);
                     neuron.biasAllowed = false;
-                    Connection connection = new Connection(ref connections, ref connectionCounter, weightRescaleFactor, false);
+                    Connection connection = new Connection(ref connections, ref connectionCounter, learningRate, weightRescaleFactor, false);
                     connection.weight = 1;
                     neuron.Idx = neuronCounter;
                     connection.srcDest[prevNeuronIdx] = neuron.Idx;
-                    neuron.incommingConnection.Add(connection.Idx);
+                    neuron.incomingConnection.Add(connection.Idx);
                     neurons[prevNeuronIdx].outgoingConnection.Add(connection.Idx);
                     neurons[neuronCounter++] = neuron;
                     neuronIdxs.Add(neuron.Idx);
@@ -574,7 +641,8 @@ namespace Dabas.NeuralNetwork
                 neuronIdxs = new List<int>();
                 for (int i = 0; i < currLayerData.cntNeurons; i++)
                 {
-                    Neuron neuron = new Neuron(tFuncType, previousLayer, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, weightRescaleFactor);
+                    Neuron neuron = new Neuron(tFuncType, previousLayer, ref neurons, ref neuronCounter, ref connections,
+                        ref connectionCounter, learningRate, weightRescaleFactor);
                     neuronIdxs.Add(neuron.Idx);
                 }
             }
@@ -584,30 +652,42 @@ namespace Dabas.NeuralNetwork
                 tFuncType = TransferFuncType.LINEAR;
                 neuronIdxs = new List<int>();
                 int dimIn = (int)Math.Sqrt(previousLayer.cntNeurons);
+
                 // Form connections for each filter
                 foreach (int filter in currLayerData.filters)
                 {
+                    int filterStartIdx, filterEndIdx;
+                    if (currLayerData.padding)
+                    {
+                        filterStartIdx = -filter / 2;
+                        filterEndIdx = filter / 2;
+                    }
+                    else
+                    {
+                        filterStartIdx = 0;
+                        filterEndIdx = filter - 1;
+                    }
                     Dictionary<int, int> filterConnections = new Dictionary<int, int>();
-                    for (int k1 = -filter / 2; k1 <= filter / 2; k1++)
-                        for (int k2 = -filter / 2; k2 <= filter / 2; k2++)
+                    for (int k1 = filterStartIdx; k1 <= filterEndIdx; k1++)
+                        for (int k2 = filterStartIdx; k2 <= filterEndIdx; k2++)
                         {
-                            Connection connection = new Connection(ref connections, ref connectionCounter, weightRescaleFactor);
+                            Connection connection = new Connection(ref connections, ref connectionCounter, learningRate, weightRescaleFactor);
                             int hashIdx = (k1 + filter / 2) * filter + (k2 + filter / 2);
                             connection.weight = 1;
                             connection.updateAllowed = false;
                             filterConnections[hashIdx] = connection.Idx;
                         }
                     // Zero padding is introduced for area which is not completly overlapped by filter
-                    for (int i = 0; i < dimIn; i += currLayerData.stride)
-                        for (int j = 0; j < dimIn; j += currLayerData.stride)
+                    for (int i = 0; i + (currLayerData.padding ? 0 : filter - 1) < dimIn; i += currLayerData.stride)
+                        for (int j = 0; j + (currLayerData.padding ? 0 : filter - 1) < dimIn; j += currLayerData.stride)
                         {
                             Neuron neuron = new Neuron(tFuncType);
                             neuron.Idx = neuronCounter;
                             neuron.biasAllowed = false;
                             neurons[neuronCounter++] = neuron;
                             neuronIdxs.Add(neuron.Idx);
-                            for (int k1 = -filter / 2; k1 <= filter / 2; k1++)
-                                for (int k2 = -filter / 2; k2 <= filter / 2; k2++)
+                            for (int k1 = filterStartIdx; k1 <= filterEndIdx; k1++)
+                                for (int k2 = filterStartIdx; k2 <= filterEndIdx; k2++)
                                 {
                                     int idx = GetIndex(i + k1, j + k2, dimIn, previousLayer);
                                     if (idx == -1)
@@ -616,7 +696,7 @@ namespace Dabas.NeuralNetwork
                                     int cIdx = filterConnections[hashIdx];
                                     connections[cIdx].srcDest[idx] = neuron.Idx;
                                     neurons[idx].outgoingConnection.Add(cIdx);
-                                    neurons[neuron.Idx].incommingConnection.Add(cIdx);
+                                    neurons[neuron.Idx].incomingConnection.Add(cIdx);
                                 }
                         }
                 }
@@ -642,7 +722,7 @@ namespace Dabas.NeuralNetwork
                         for (int k1 = 0; k1 < currLayerData.size; k1++)
                             for (int k2 = 0; k2 < currLayerData.size; k2++)
                             {
-                                Connection connection = new Connection(ref connections, ref connectionCounter, 1, false);
+                                Connection connection = new Connection(ref connections, ref connectionCounter, learningRate, weightRescaleFactor, false);
                                 connection.weight = 1;
                                 int hashIdx = k1 * currLayerData.size + k2;
                                 filterConnections[hashIdx] = connection.Idx;
@@ -659,7 +739,7 @@ namespace Dabas.NeuralNetwork
                                 int cIdx = filterConnections[hashIdx];
                                 connections[cIdx].srcDest[idx] = neuron.Idx;
                                 neurons[idx].outgoingConnection.Add(cIdx);
-                                neurons[neuron.Idx].incommingConnection.Add(cIdx);
+                                neurons[neuron.Idx].incomingConnection.Add(cIdx);
                             }
                     }
             }
@@ -685,7 +765,8 @@ namespace Dabas.NeuralNetwork
         public static void ConstructLayers(object[] layersData, ref List<Layer> layers,
                                             ref Dictionary<int, Neuron> neurons, ref int neuronCounter,
                                             ref Dictionary<int, Connection> connections, ref int connectionCounter,
-                                            double weightRescaleFactor = 1)
+                                            double learningRate,
+                                            double weightRescaleFactor)
         {
             List<Layer> lastSubLayers = new List<Layer>();
             Layer lastLayer = null;
@@ -693,7 +774,7 @@ namespace Dabas.NeuralNetwork
             {
                 if (layerData is LayerData.FullyConnected)
                 {
-                    lastLayer = new Layer(lastLayer, layerData, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, weightRescaleFactor);
+                    lastLayer = new Layer(lastLayer, layerData, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, learningRate, weightRescaleFactor);
                     lastSubLayers.Clear();
                     lastSubLayers.Add(lastLayer);
                 }
@@ -710,7 +791,7 @@ namespace Dabas.NeuralNetwork
                             layerDataTmp.stride = currLayerData.stride;
                             layerDataTmp.filters = new int[] { filter };
 
-                            Layer layerTmp = new Layer(subLayer, layerDataTmp, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, weightRescaleFactor);
+                            Layer layerTmp = new Layer(subLayer, layerDataTmp, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, learningRate, weightRescaleFactor);
                             currSubLayers.Add(layerTmp);
                             lastLayer.MergeLayer(layerTmp);
                         }
@@ -723,7 +804,7 @@ namespace Dabas.NeuralNetwork
                     lastLayer = new Layer(TransferFuncType.RECTILINEAR);
                     foreach (Layer subLayer in lastSubLayers)
                     {
-                        Layer layerTmp = new Layer(subLayer, layerData, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, weightRescaleFactor);
+                        Layer layerTmp = new Layer(subLayer, layerData, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, learningRate, weightRescaleFactor);
                         currSubLayers.Add(layerTmp);
                         lastLayer.MergeLayer(layerTmp);
                     }
@@ -735,7 +816,7 @@ namespace Dabas.NeuralNetwork
                     lastLayer = new Layer(TransferFuncType.MAXPOOL);
                     foreach (Layer subLayer in lastSubLayers)
                     {
-                        Layer layerTmp = new Layer(subLayer, layerData, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, weightRescaleFactor);
+                        Layer layerTmp = new Layer(subLayer, layerData, ref neurons, ref neuronCounter, ref connections, ref connectionCounter, learningRate, weightRescaleFactor);
                         currSubLayers.Add(layerTmp);
                         lastLayer.MergeLayer(layerTmp);
                     }
@@ -762,7 +843,7 @@ namespace Dabas.NeuralNetwork
     {
         public double input, output, deltaBack, bias, deltaBias;
         public int Idx;
-        public List<int> incommingConnection, outgoingConnection;
+        public List<int> incomingConnection, outgoingConnection;
         public TransferFuncType tFuncType;
         public bool biasAllowed;
 
@@ -776,7 +857,7 @@ namespace Dabas.NeuralNetwork
             this.tFuncType = tFuncType;
             biasAllowed = true;
 
-            incommingConnection = new List<int>();
+            incomingConnection = new List<int>();
             outgoingConnection = new List<int>();
         }
 
@@ -788,7 +869,8 @@ namespace Dabas.NeuralNetwork
         public Neuron(TransferFuncType tFuncType, Layer previousLayer,
             ref Dictionary<int, Neuron> neurons, ref int neuronCounter,
             ref Dictionary<int, Connection> connections, ref int connectionCounter,
-            double weightRescaleFactor = 1)
+            double learningRate,
+            double weightRescaleFactor)
         {
             INIT(tFuncType);
 
@@ -796,9 +878,9 @@ namespace Dabas.NeuralNetwork
             {
                 foreach (int neuronIdx in previousLayer.neuronIdxs)
                 {
-                    Connection connection = new Connection(ref connections, ref connectionCounter, weightRescaleFactor);
+                    Connection connection = new Connection(ref connections, ref connectionCounter, learningRate, weightRescaleFactor);
                     connection.srcDest[neuronIdx] = neuronCounter;
-                    this.incommingConnection.Add(connection.Idx);
+                    this.incomingConnection.Add(connection.Idx);
                     neurons[neuronIdx].outgoingConnection.Add(connection.Idx);
                 }
             }
@@ -815,7 +897,7 @@ namespace Dabas.NeuralNetwork
             {
                 int cFinalIdx = -1;
                 double finalOut = int.MinValue;
-                foreach (int cIdx in incommingConnection)
+                foreach (int cIdx in incomingConnection)
                 {
                     connections[cIdx].weight = 0;
                     foreach (int key in connections[cIdx].srcDest.Keys)
@@ -866,12 +948,14 @@ namespace Dabas.NeuralNetwork
         public double weight;
         public double weightDelta;
         public double previousWeightDelta;
+        public double learningRate;
         public bool updateAllowed;
 
-        public Connection(ref Dictionary<int, Connection> connections, ref int connectionCounter,
-                          double weightRescaleFactor = 1, bool updateAllowed = true)
+        public Connection(ref Dictionary<int, Connection> connections, ref int connectionCounter, double learningRate,
+                          double weightRescaleFactor, bool updateAllowed = true)
         {
             this.updateAllowed = updateAllowed;
+            this.learningRate = learningRate;
             weight = Gaussian.GetRandomGaussian() / weightRescaleFactor;
             weightDelta = 0;
             previousWeightDelta = 0;

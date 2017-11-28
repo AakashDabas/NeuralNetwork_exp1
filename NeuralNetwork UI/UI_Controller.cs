@@ -7,6 +7,8 @@ using System.Windows.Forms;
 
 namespace Dabas.NeuralNetwork_UI
 {
+    public delegate void Callback(string paramType, string paramValue);
+
     public class NeuralNetworkUI
     {
         public NNUIFORM nnUIForm;
@@ -14,9 +16,9 @@ namespace Dabas.NeuralNetwork_UI
         delegate void InvokeHelperInt2(int a, int b);
         static Semaphore semaphore = new Semaphore(1, 1);
 
-        public NeuralNetworkUI()
+        public NeuralNetworkUI(Callback _callback)
         {
-            nnUIForm = new NNUIFORM();
+            nnUIForm = new NNUIFORM(_callback);
         }
 
         [STAThread]
@@ -41,8 +43,8 @@ namespace Dabas.NeuralNetwork_UI
             }
             else
             {
-                    if (nnUIForm.outputBox.SelectedText == "")
-                        nnUIForm.outputBox.Text += System.DateTime.Now.ToString() + " | " + text + "\n";
+                if (nnUIForm.outputBox.SelectedText == "")
+                    nnUIForm.outputBox.Text += System.DateTime.Now.ToString() + " | " + text + "\n";
             }
         }
 
@@ -55,6 +57,26 @@ namespace Dabas.NeuralNetwork_UI
                 nnUIForm.trainingProgressBar.Maximum = cntTotalTraining;
                 nnUIForm.trainingProgressBar.Value = cntTrainingDone;
                 SetTrainingPercentange(cntTrainingDone, cntTotalTraining);
+            }
+        }
+
+        public void SetLearningRate(string rate)
+        {
+            if (nnUIForm.rateInput.InvokeRequired)
+                nnUIForm.rateInput.BeginInvoke(new InvokeHelperStr1(SetLearningRate), rate);
+            else
+            {
+                nnUIForm.rateInput.Text = rate;
+            }
+        }
+
+        public void SetMomentum(string momentum)
+        {
+            if (nnUIForm.momentumInput.InvokeRequired)
+                nnUIForm.momentumInput.BeginInvoke(new InvokeHelperStr1(SetMomentum), momentum);
+            else
+            {
+                nnUIForm.momentumInput.Text = momentum;
             }
         }
 
